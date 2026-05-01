@@ -47,7 +47,7 @@ def mudar_pagina(nome): st.session_state.pagina = nome
 st.markdown("""
     <div class="header-container">
         <h1 class="header-title">🚜 Gestão de Pilotos</h1>
-        <div class="header-subtitle">Aplicativo de Monitoramento | Peterson Santos - COA</div>
+        <div class="header-subtitle">Aplicativo de Monitoramento | Peterson Santos </div>
     </div>
 """, unsafe_allow_html=True)
 
