@@ -3,138 +3,145 @@ import pandas as pd
 from supabase import create_client, Client
 from datetime import datetime, date
 
-# --- CONFIGURAÇÕES DO SUPABASE ---
-# O Streamlit Cloud lê dos "Secrets" configurados no site.
-if "SUPABASE_URL" in st.secrets:
-    SUPABASE_URL = st.secrets["SUPABASE_URL"]
-    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-else:
-    # Backup para rodar localmente no seu computador
-    SUPABASE_URL = "https://wjejxlnclrdpigpratrt.supabase.co"
-    SUPABASE_KEY = "sb_publishable_TZrkyrcPDgaqcgTcZcmvPQ_UofXX50m"
-
+# --- CONEXÃO ---
+SUPABASE_URL = "https://wjejxlnclrdpigpratrt.supabase.co"
+SUPABASE_KEY = "sb_publishable_TZrkyrcPDgaqcgTcZcmvPQ_UofXX50m"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(page_title="Gestão de Pilotos COA", page_icon="🚜", layout="centered")
+st.set_page_config(page_title="Gestão GPS COA", page_icon="🚜", layout="wide")
 
-# Estilos Visuais
+# Estilização Profissional
 st.markdown("""
     <style>
-    .stButton>button { width: 100%; border-radius: 10px; height: 60px; background-color: #2e7d32; color: white; font-weight: bold; margin-bottom: 10px; }
-    .header { background-color: #2e7d32; padding: 15px; border-radius: 10px; color: white; text-align: center; margin-bottom: 25px; }
-    div[data-testid="stExpander"] { border: 1px solid #2e7d32; border-radius: 10px; }
+    .main { background-color: #f5f7f9; }
+    .stButton>button { width: 100%; border-radius: 8px; height: 50px; font-weight: bold; }
+    .card { background-color: white; padding: 20px; border-radius: 15px; border: 1px solid #e6e9ef; box-shadow: 2px 2px 10px rgba(0,0,0,0.05); }
+    .status-ok { color: #2e7d32; font-weight: bold; }
+    .status-alerta { color: #f57c00; font-weight: bold; }
+    .header { background: linear-gradient(90deg, #1b5e20 0%, #2e7d32 100%); padding: 20px; border-radius: 10px; color: white; text-align: center; margin-bottom: 20px; }
     </style>
 """, unsafe_allow_html=True)
 
-# Controle de Navegação
-if 'pagina' not in st.session_state:
-    st.session_state.pagina = 'Home'
+# --- SISTEMA DE NAVEGAÇÃO ---
+if 'pagina' not in st.session_state: st.session_state.pagina = 'Home'
+def mudar_pagina(nome): st.session_state.pagina = nome
 
-def mudar_pagina(nome):
-    st.session_state.pagina = nome
+# --- FUNÇÕES DE LÓGICA ---
+def buscar_validade(serie_antena, serie_monitor):
+    """Lógica Inteligente: Busca validade na Antena, se não achar, busca no Monitor"""
+    # 1. Tenta na tabela de Licenças pelo número de série
+    for serie in [serie_antena, serie_monitor]:
+        if serie:
+            res = supabase.table("licencas_validades").select("data_vencimento").eq("licenca", str(serie)).execute()
+            if res.data:
+                return res.data[0]['data_vencimento']
+    return "Não encontrada"
 
-# Header fixo
-st.markdown('<div class="header"><h1>🚜 Gestão de Pilotos COA</h1><p>Qualidade Agrícola</p></div>', unsafe_allow_html=True)
+# --- UI - HEADER ---
+st.markdown('<div class="header"><h1>🚜 Qualidade Agrícola - Gestão de Pilotos</h1></div>', unsafe_allow_html=True)
 
-# --- 1. HOME (MENU) ---
+# --- PÁGINA HOME ---
 if st.session_state.pagina == 'Home':
-    c1, c2 = st.columns(2)
-    with c1:
-        if st.button("📝 Novo Cadastro"): mudar_pagina('Cadastro')
-        if st.button("🚜 Frotas"): mudar_pagina('Frotas')
-    with c2:
-        if st.button("🖥️ Monitores"): mudar_pagina('Monitores')
-        if st.button("📡 Antenas"): mudar_pagina('Antenas')
+    col_nav, col_busca = st.columns([1, 3])
+    with col_nav:
+        if st.button("➕ Novo Equipamento"): mudar_pagina('Cadastro')
+        if st.button("🔔 Ver Vencimentos"): mudar_pagina('Vencimentos')
     
-    if st.button("🔔 Vencimentos de Sinal"): mudar_pagina('Vencimentos')
+    with col_busca:
+        busca = st.text_input("🔍 Buscar por Frota ou Nome...", placeholder="Ex: 1218")
 
-# --- 2. TELA DE CADASTRO (Ajustada para image_fd0667.png) ---
+    # Listagem de Equipamentos em Cards
+    res = supabase.table("equipamentos").select("*").order("codigo_do_equipamento").execute()
+    if res.data:
+        df = pd.DataFrame(res.data)
+        if busca:
+            df = df[df['codigo_do_equipamento'].astype(str).str.contains(busca) | df['nome'].str.contains(busca, case=False)]
+
+        cols = st.columns(3)
+        for idx, row in df.iterrows():
+            with cols[idx % 3]:
+                st.markdown(f"""
+                <div class="card">
+                    <h3>🚜 Frota: {row['codigo_do_equipamento']}</h3>
+                    <p><b>Modelo:</b> {row['nome']}</p>
+                    <hr>
+                    <p>🖥️ <b>Monitor:</b> {row['monitor'] or '---'}</p>
+                    <p>📡 <b>Antena:</b> {row['antena'] or '---'}</p>
+                    <p>🧭 <b>NAV:</b> {row['nav'] or '---'}</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Botão de edição para cada card
+                if st.button(f"Editar Frota {row['codigo_do_equipamento']}", key=f"ed_{row['id']}"):
+                    st.session_state.equip_edit = row
+                    mudar_pagina('Editar')
+                st.write("")
+
+# --- PÁGINA DE EDIÇÃO/ALTERAÇÃO ---
+elif st.session_state.pagina == 'Editar':
+    equip = st.session_state.equip_edit
+    st.subheader(f"📝 Alterar Equipamentos - Frota {equip['codigo_do_equipamento']}")
+    
+    with st.form("form_edit"):
+        col1, col2 = st.columns(2)
+        novo_monitor = col1.text_input("Série Monitor", value=equip['monitor'])
+        nova_antena = col2.text_input("Série Antena", value=equip['antena'])
+        novo_nav = col1.text_input("Série NAV", value=equip['nav'])
+        
+        # Busca validade em tempo real
+        validade = buscar_validade(nova_antena, novo_monitor)
+        st.info(f"📅 Validade de Sinal detectada: {validade}")
+
+        if st.form_submit_button("Salvar Alterações"):
+            update_data = {
+                "monitor": novo_monitor,
+                "antena": nova_antena,
+                "nav": novo_nav,
+                "data_vencimento": validade if validade != "Não encontrada" else None
+            }
+            supabase.table("equipamentos").update(update_data).eq("id", equip['id']).execute()
+            st.success("Dados atualizados com sucesso!")
+            mudar_pagina('Home')
+            st.rerun()
+    
+    if st.button("Cancelar"): mudar_pagina('Home')
+
+# --- PÁGINA DE CADASTRO ---
 elif st.session_state.pagina == 'Cadastro':
-    if st.button("⬅️ Voltar para o Menu"): mudar_pagina('Home')
-    st.subheader("📝 Novo Cadastro de Equipamento")
-    
+    st.subheader("➕ Inserir Novo Equipamento na Frota")
     with st.form("form_cadastro"):
-        tipo = st.selectbox("Tipo de Equipamento", ["Monitor", "Antena"])
-        n_serie = st.text_input("Número de Série")
-        modelo = st.text_input("Modelo (Ex: GS3, SF6000)")
-        situacao = st.selectbox("Situação", ["Estoque", "Em Uso", "Manutenção"])
-        frota_input = st.text_input("Frota ID (Apenas números ou deixe vazio)")
-        vencimento = st.date_input("Data de Vencimento do Sinal", value=date.today())
-        
-        if st.form_submit_button("Salvar no Banco"):
-            # Trata o Frota ID para não dar erro 22P02 no Supabase
-            frota_final = int(frota_input) if frota_input.strip().isdigit() else None
-            
-            # Nomes das chaves batendo 100% com o print do Supabase
-            dados = {
-                "numero_serie": n_serie,
-                "tipo": tipo,
-                "modelo": modelo,
-                "situacao": situacao,
-                "frota_id": frota_final, 
-                "data_vencimento_licenca": str(vencimento)
-            }
-            try:
-                supabase.table("ativos").insert(dados).execute()
-                st.success("✅ Equipamento cadastrado com sucesso!")
-            except Exception as e:
-                st.error(f"Erro ao salvar: {e}")
-
-# --- 3. TELA DE FROTAS (Ajustada para image_fd06a0.png) ---
-elif st.session_state.pagina == 'Frotas':
-    if st.button("⬅️ Voltar para o Menu"): mudar_pagina('Home')
-    st.subheader("🚜 Gestão de Máquinas")
-    
-    with st.expander("➕ Adicionar Nova Máquina"):
         c1, c2 = st.columns(2)
-        cod = c1.text_input("Código da Frota")
-        mod_m = c2.text_input("Modelo da Máquina")
-        tipo_m = st.selectbox("Tipo", ["Trator", "Colhedora", "Pulverizador"])
+        tipo = c1.selectbox("Tipo", ["[TR] GRUNNER", "[TR] CASE", "[TR] JOHN DEERE"])
+        codigo = c2.text_input("Código da Frota (Ex: 1500)")
+        nome = st.text_input("Nome/Descrição do Equipamento")
         
-        if st.button("Salvar Máquina"):
-            dados_frota = {
-                "codigo_frota": cod, 
-                "modelo": mod_m,
-                "tipo_equipamento": tipo_m
-            }
-            try:
-                supabase.table("frotas").insert(dados_frota).execute()
-                st.success("✅ Máquina salva!")
+        if st.form_submit_button("Cadastrar"):
+            if codigo and nome:
+                supabase.table("equipamentos").insert({
+                    "tipo_de_equipamento": tipo,
+                    "codigo_do_equipamento": codigo,
+                    "nome": nome
+                }).execute()
+                st.success("Equipamento adicionado!")
+                mudar_pagina('Home')
                 st.rerun()
-            except Exception as e:
-                st.error(f"Erro: {e}")
+            else:
+                st.error("Preencha Código e Nome.")
+    if st.button("Voltar"): mudar_pagina('Home')
 
-    # Exibição da Tabela de Frotas
-    res = supabase.table("frotas").select("*").execute()
-    if res.data:
-        st.table(pd.DataFrame(res.data)[['codigo_frota', 'modelo', 'tipo_equipamento']])
-
-# --- 4. LISTAGENS (MONITORES E ANTENAS) ---
-elif st.session_state.pagina in ['Monitores', 'Antenas']:
-    if st.button("⬅️ Voltar para o Menu"): mudar_pagina('Home')
-    tipo_filtro = "Monitor" if st.session_state.pagina == 'Monitores' else "Antena"
-    st.subheader(f"📋 Lista de {st.session_state.pagina}")
-    
-    res = supabase.table("ativos").select("*").eq("tipo", tipo_filtro).execute()
-    if res.data:
-        df = pd.DataFrame(res.data)
-        st.dataframe(df[['numero_serie', 'modelo', 'situacao', 'frota_id']], use_container_width=True)
-    else:
-        st.info("Nenhum registro encontrado.")
-
-# --- 5. TELA DE VENCIMENTOS ---
+# --- PÁGINA DE VENCIMENTOS ---
 elif st.session_state.pagina == 'Vencimentos':
-    if st.button("⬅️ Voltar para o Menu"): mudar_pagina('Home')
-    st.subheader("🔔 Vencimentos de Licença")
+    st.subheader("🔔 Relatório de Validades")
+    if st.button("⬅️ Voltar"): mudar_pagina('Home')
     
-    res = supabase.table("ativos").select("*").execute()
+    res = supabase.table("equipamentos").select("codigo_do_equipamento, nome, data_vencimento, antena, monitor").execute()
     if res.data:
-        df = pd.DataFrame(res.data)
-        hoje = date.today()
-        for _, row in df.iterrows():
-            if row['data_vencimento_licenca']:
-                dv = datetime.strptime(row['data_vencimento_licenca'], '%Y-%m-%d').date()
-                cor = "red" if dv <= hoje else "orange" if (dv - hoje).days < 30 else "green"
-                st.markdown(f"**Série:** `{row['numero_serie']}` | Vence: <span style='color:{cor}; font-weight:bold;'>{dv.strftime('%d/%m/%Y')}</span>", unsafe_allow_html=True)
-                st.divider()
+        df_v = pd.DataFrame(res.data)
+        df_v = df_v.dropna(subset=['data_vencimento'])
+        df_v['data_vencimento'] = pd.to_datetime(df_v['data_vencimento'])
+        
+        hoje = datetime.now()
+        df_v['Status'] = df_v['data_vencimento'].apply(lambda x: "🔴 VENCIDO" if x < hoje else "🟢 OK")
+        
+        st.dataframe(df_v.sort_values("data_vencimento"), use_container_width=True)
