@@ -5,62 +5,39 @@ def render(go):
     # 🎨 CSS PROFISSIONAL
     # ================================
     st.markdown("""
-        <style>
-        .block-container {
-            max-width: 620px;
-            padding-top: 1.5rem;
-        }
+    <style>
+    .block-container {
+        max-width: 700px;
+        padding-top: 1rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
 
-        /* HEADER */
-        .header {
-            text-align: center;
-            margin-bottom: 20px;
-        }
+    /* REMOVE qualquer corte de texto */
+    * {
+        word-wrap: break-word !important;
+        white-space: normal !important;
+    }
 
-        .header-title {
-            font-size: 22px;
-            font-weight: 700;
-        }
+    /* BOTÕES */
+    div.stButton > button {
+        height: 65px;
+        border-radius: 12px;
+        font-size: 15px;
+        font-weight: 600;
+        white-space: normal !important;
+        line-height: 1.2;
+    }
 
-        .header-sub {
-            font-size: 13px;
-            color: #6c757d;
-        }
-
-        /* SECTION */
-        .section-title {
-            font-size: 14px;
-            font-weight: 600;
-            color: #6c757d;
-            margin: 15px 0 5px 5px;
-        }
-
-        /* CARD */
-        .card {
-            background: white;
-            padding: 16px;
-            border-radius: 14px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-            margin-bottom: 10px;
-        }
-
-        /* BOTÕES */
-        div.stButton > button {
-            height: 65px;
-            border-radius: 12px;
-            font-size: 16px;
-            font-weight: 600;
-        }
-
-        /* BOTÃO PRINCIPAL */
-        .primary button {
-            background-color: #2e7d32 !important;
-            color: white !important;
-        }
-
-        </style>
-    """, unsafe_allow_html=True)
-
+    /* SECTION */
+    .section-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: #6c757d;
+        margin: 15px 0 8px 5px;
+    }
+    </style>
+""", unsafe_allow_html=True)
     # ================================
     # 🧠 HEADER
     # ================================
