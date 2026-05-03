@@ -45,7 +45,7 @@ def render(go):
 """, unsafe_allow_html=True)
 
     # Título Centralizado e com fonte menor que o padrão H1
-    st.markdown('<div class="main-title">Gestão de Componentes</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-title">🚜 Gestão de Componentes</div>', unsafe_allow_html=True)
 
     # ================================
     # 🚜 OPERAÇÃO
