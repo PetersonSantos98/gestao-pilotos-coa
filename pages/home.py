@@ -1,7 +1,7 @@
 import streamlit as st
 
 def render(go):
-   col1, col2 = st.columns(2)
+    col1, col2 = st.columns(2)
     
     with col1:
         if st.button("🚜 Frotas", use_container_width=True): go("frotas")
@@ -12,7 +12,8 @@ def render(go):
         if st.button("🔔 Vencimentos", use_container_width=True): go("vencimentos")
         if st.button("📡 Antenas", use_container_width=True): go("antenas")
         if st.button("🖥️ Monitores", use_container_width=True): go("monitores")
-        
+    
+    st.markdown("---") # Uma linha discreta para separar
     if st.button("🔄 Atualizar Dados", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
