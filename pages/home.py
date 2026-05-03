@@ -1,43 +1,43 @@
 import streamlit as st
 
 def render(go):
-    # ================================
-    # 🎨 CSS AJUSTADO (RESOLVE CORTE E CENTRALIZA)
-    # ================================
+    # 1. EMPURRANDO O CONTEÚDO PARA BAIXO (O "Pulo do Gato")
+    # Isso garante que o título comece abaixo da área de corte do sistema
+    st.write("#") 
+    st.write("") 
+
+    # 2. CSS PARA CORRIGIR O ESTILO
     st.markdown("""
     <style>
-    /* Resolve o corte no topo e centraliza o conteúdo */
+    /* Remove o espaço fixo que o Streamlit reserva no topo */
+    .stAppHeader {
+        display: none;
+    }
+    
     .block-container {
         max-width: 500px !important;
-        padding-top: 0rem !important; /* Remove o espaço que corta o título */
+        padding-top: 2rem !important; /* Aumentamos aqui para garantir */
         margin: auto;
     }
 
-    /* Tira o espaço extra entre o topo da página e o título */
-    #root > div:nth-child(1) > div > div > div > div > section > div {
-        padding-top: 1rem !important;
-    }
-
-    /* BOTÕES: Ajuste de fonte para não quebrar texto */
+    /* BOTÕES: Fonte menor e sem quebra */
     div.stButton > button {
         height: 55px;
         border-radius: 10px;
-        font-size: 14px !important; /* Letra levemente menor para caber tudo */
+        font-size: 13px !important; 
         font-weight: 600;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        white-space: nowrap !important; /* Impede a quebra de linha no texto */
+        white-space: nowrap !important;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
-    /* SECTION TITLE */
+    /* TÍTULOS DE SEÇÃO */
     .section-title {
-        font-size: 13px;
+        font-size: 12px;
         font-weight: 700;
         color: #888;
         text-transform: uppercase;
-        margin: 20px 0 5px 5px;
-        letter-spacing: 1px;
+        margin: 15px 0 5px 5px;
     }
     </style>
 """, unsafe_allow_html=True)
