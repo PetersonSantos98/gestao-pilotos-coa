@@ -2,42 +2,46 @@ import streamlit as st
 
 def render(go):
     # ================================
-    # 🎨 CSS PROFISSIONAL
+    # 🎨 CSS AJUSTADO (RESOLVE CORTE E CENTRALIZA)
     # ================================
     st.markdown("""
     <style>
+    /* Resolve o corte no topo e centraliza o conteúdo */
     .block-container {
-        max-width: 700px;
-        padding-top: 1rem;
-        padding-left: 1rem;
-        padding-right: 1rem;
+        max-width: 500px !important;
+        padding-top: 0rem !important; /* Remove o espaço que corta o título */
+        margin: auto;
     }
 
-    /* REMOVE qualquer corte de texto */
-    * {
-        word-wrap: break-word !important;
-        white-space: normal !important;
+    /* Tira o espaço extra entre o topo da página e o título */
+    #root > div:nth-child(1) > div > div > div > div > section > div {
+        padding-top: 1rem !important;
     }
 
-    /* BOTÕES */
+    /* BOTÕES: Ajuste de fonte para não quebrar texto */
     div.stButton > button {
-        height: 65px;
-        border-radius: 12px;
-        font-size: 15px;
+        height: 55px;
+        border-radius: 10px;
+        font-size: 14px !important; /* Letra levemente menor para caber tudo */
         font-weight: 600;
-        white-space: normal !important;
-        line-height: 1.2;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        white-space: nowrap !important; /* Impede a quebra de linha no texto */
     }
 
-    /* SECTION */
+    /* SECTION TITLE */
     .section-title {
-        font-size: 14px;
-        font-weight: 600;
-        color: #6c757d;
-        margin: 15px 0 8px 5px;
+        font-size: 13px;
+        font-weight: 700;
+        color: #888;
+        text-transform: uppercase;
+        margin: 20px 0 5px 5px;
+        letter-spacing: 1px;
     }
     </style>
 """, unsafe_allow_html=True)
+
     # ================================
     # 🚜 OPERAÇÃO
     # ================================
