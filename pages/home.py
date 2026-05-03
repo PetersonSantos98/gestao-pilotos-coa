@@ -39,16 +39,6 @@ def render(go):
     </style>
 """, unsafe_allow_html=True)
     # ================================
-    # 🧠 HEADER
-    # ================================
-    st.markdown("""
-        <div class="header">
-            <div class="header-title">🚜 Gestão de Pilotos</div>
-            <div class="header-sub">Controle de frotas e dispositivos</div>
-        </div>
-    """, unsafe_allow_html=True)
-
-    # ================================
     # 🚜 OPERAÇÃO
     # ================================
     st.markdown('<div class="section-title">Operação</div>', unsafe_allow_html=True)
