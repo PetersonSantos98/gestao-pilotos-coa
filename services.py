@@ -41,7 +41,7 @@ def get_equipamentos():
         supabase = get_client()
 
         res = supabase.table("Equipamentos") \
-            .select("id, codigo_do_equipamento, nome, antena, monitor") \
+            .select("id, codigo_do_equipamento, nome, antena, monitor, nav") \
             .order("codigo_do_equipamento") \
             .execute()
 
