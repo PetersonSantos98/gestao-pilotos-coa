@@ -10,7 +10,7 @@ def go(page):
     st.session_state.page = page
     st.rerun()
 
-st.markdown("## 🚜 Gestão de Componentes")
+st.markdown("## 🚜")
 
 p = st.session_state.page
 
