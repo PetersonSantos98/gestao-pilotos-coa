@@ -93,3 +93,14 @@ def update_equipamento(equip_id, dados):
     except Exception as e:
         st.error(f"Erro ao atualizar frota: {e}")
         return False
+@st.cache_data(ttl=60)
+def get_licencas_simples():
+    """Busca todas as licenças da tabela Licencas_Validades ordenadas por vencimento."""
+    try:
+        supabase = get_client()
+        # Ordenado por data para que os que vencem antes apareçam primeiro
+        res = supabase.table("Licencas_Validades").select("*").order("data_vencimento").execute()
+        return res.data or []
+    except Exception as e:
+        st.error(f"Erro ao buscar licenças: {e}")
+        return []
