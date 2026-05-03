@@ -1,126 +1,56 @@
 import streamlit as st
 from supabase import create_client
 
-# ================================
-# 🔐 CONFIG AUTOMÁTICA (SECRETS + FALLBACK)
-# ================================
 def get_config():
     try:
-        # Produção (Streamlit Secrets)
         url = st.secrets["SUPABASE_URL"]
         key = st.secrets["SUPABASE_KEY"]
     except:
-        # 🔥 Fallback TEMPORÁRIO (protótipo)
         url = "https://wjejxlnclrdpigpratrt.supabase.co"
         key = "sb_publishable_TZrkyrcPDgaqcgTcZcmvPQ_UofXX50m"
-
     return url, key
 
-
-# ================================
-# 🔌 CLIENTE SUPABASE
-# ================================
 @st.cache_resource
 def get_client():
     url, key = get_config()
+    return create_client(url, key)
 
-    try:
-        # ✅ SEM options (corrige seu erro)
-        return create_client(url, key)
-    except Exception as e:
-        st.error(f"Erro ao conectar no Supabase: {e}")
-        st.stop()
-
-
-# ================================
-# 🚜 EQUIPAMENTOS
-# ================================
+# --- BUSCA EQUIPAMENTOS ---
 @st.cache_data(ttl=60)
 def get_equipamentos():
-    try:
-        supabase = get_client()
+    supabase = get_client()
+    # Busca dados da tabela principal
+    res = supabase.table("Equipamentos").select("*").order("codigo_do_equipamento").execute()
+    return res.data or []
 
-        res = supabase.table("Equipamentos") \
-            .select("id, codigo_do_equipamento, nome, antena, monitor, nav") \
-            .order("codigo_do_equipamento") \
-            .execute()
+# --- BUSCA LICENÇAS COM RELAÇÃO (ITEM 3) ---
+@st.cache_data(ttl=60)
+def get_licencas_com_equipamento():
+    supabase = get_client()
+    # Cruzamento de Licencas_Validades com Equipamentos
+    res = supabase.table("Licencas_Validades").select("*, Equipamentos(codigo_do_equipamento, nome)").execute()
+    return res.data or []
 
-        return res.data or []
+# --- BUSCA ITENS DISPONÍVEIS (ITEM 1) ---
+def get_itens_disponiveis(tabela, coluna_serie, valor_atual=None):
+    supabase = get_client()
+    # Busca todos os itens da tabela mestre (ex: Antenas)
+    todos = supabase.table(tabela).select("*").execute().data or []
+    
+    # Busca o que já está em uso na tabela Equipamentos (na coluna correspondente)
+    col_vinc = "antena" if tabela == "Antenas" else ("monitor" if tabela == "Monitores" else "nav")
+    em_uso = supabase.table("Equipamentos").select(col_vinc).execute().data
+    series_em_uso = [x[col_vinc] for x in em_uso if x[col_vinc]]
 
-    except Exception as e:
-        st.error(f"Erro ao buscar equipamentos: {e}")
-        return []
-
-
-def get_equipamento_por_id(equip_id):
-    try:
-        supabase = get_client()
-
-        res = supabase.table("Equipamentos") \
-            .select("*") \
-            .eq("id", equip_id) \
-            .single() \
-            .execute()
-
-        return res.data
-
-    except Exception as e:
-        st.error(f"Erro ao buscar equipamento: {e}")
-        return None
-
+    # Filtra: Mantém se não estiver em uso OU se for o valor que já está no equipamento atual
+    disponiveis = [item for item in todos if item[coluna_serie] not in series_em_uso or item[coluna_serie] == valor_atual]
+    return disponiveis
 
 def update_equipamento(equip_id, dados):
-    try:
-        supabase = get_client()
+    supabase = get_client()
+    supabase.table("Equipamentos").update(dados).eq("id", equip_id).execute()
+    st.cache_data.clear()
 
-        res = supabase.table("Equipamentos") \
-            .update(dados) \
-            .eq("id", equip_id) \
-            .execute()
-
-        # limpa cache pra atualizar tela
-        st.cache_data.clear()
-
-        return res.data
-
-    except Exception as e:
-        st.error(f"Erro ao atualizar equipamento: {e}")
-        return None
-
-
-# ================================
-# 📡 LICENÇAS
-# ================================
-@st.cache_data(ttl=60)
-def get_licencas():
-    try:
-        supabase = get_client()
-
-        res = supabase.table("Licencas_Validades") \
-            .select("id, licenca, data_vencimento") \
-            .order("data_vencimento") \
-            .execute()
-
-        return res.data or []
-
-    except Exception as e:
-        st.error(f"Erro ao buscar licenças: {e}")
-        return []
-
-
-def update_licenca(licenca_id, dados):
-    try:
-        supabase = get_client()
-
-        res = supabase.table("Licencias_Validades") \
-            .update(dados) \
-            .eq("id", licenca_id) \
-            .execute()
-
-        st.cache_data.clear()
-
-        return res.data
-
-    except Exception as e:
-        st.error(f"Erro ao atualizar licença: {e}")
-        return None
+def get_tabela_simples(tabela):
+    supabase = get_client()
+    return supabase.table(tabela).select("*").execute().data or []
