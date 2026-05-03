@@ -1,7 +1,7 @@
 import streamlit as st
 from pages import home, frotas, editar, vencimentos, componentes
 
-st.set_page_config(page_title="Gestão COA", layout="centered")
+st.set_page_config(page_title="Gestão de Componentes", layout="centered")
 
 if "page" not in st.session_state:
     st.session_state.page = "home"
@@ -10,7 +10,7 @@ def go(page):
     st.session_state.page = page
     st.rerun()
 
-st.markdown("## 🚜 Gestão de Pilotos - COA")
+st.markdown("## 🚜Gestão de Componentes")
 
 # ROTEAMENTO
 p = st.session_state.page
