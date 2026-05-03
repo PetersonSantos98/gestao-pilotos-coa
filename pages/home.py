@@ -7,12 +7,12 @@ def render(go):
     
     with col1:
         if st.button("🚜 Frotas", use_container_width=True): go("frotas")
-        if st.button("📡 Antenas", use_container_width=True): go("antenas")
+        if st.button("➕ Nova Frota", use_container_width=True): go("adicionar_frota")
         if st.button("🧭 NAVs", use_container_width=True): go("navs")
 
     with col2:
-        if st.button("➕ Nova Frota", use_container_width=True): go("adicionar_frota")
         if st.button("🔔 Vencimentos", use_container_width=True): go("vencimentos")
+        if st.button("📡 Antenas", use_container_width=True): go("antenas")
         if st.button("🖥️ Monitores", use_container_width=True): go("monitores")
         
     if st.button("🔄 Atualizar Dados", use_container_width=True):
