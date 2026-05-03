@@ -96,7 +96,7 @@ def get_licencas():
     try:
         supabase = get_client()
 
-        res = supabase.table("Licencias_Validades") \
+        res = supabase.table("Licencas_Validades") \
             .select("id, licenca, data_vencimento") \
             .order("data_vencimento") \
             .execute()
