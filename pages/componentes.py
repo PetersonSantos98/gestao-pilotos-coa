@@ -4,52 +4,62 @@ from services import get_tabela_simples, add_registro
 def render(go, tipo):
     if st.button("⬅️ Voltar"): go("home")
     
+    # Mapeamento para garantir que usamos os nomes das tabelas do banco
     tabelas = {"antenas": "Antenas", "monitores": "Monitores", "navs": "Navs"}
     nome_tabela = tabelas.get(tipo)
     st.subheader(f"📋 Gestão de {nome_tabela}")
 
-    # --- FORMULÁRIO DE CADASTRO COM LOGICA DE COLUNAS REAIS ---
+    # --- FORMULÁRIO DE CADASTRO ESPECÍFICO ---
     with st.expander(f"➕ Novo Cadastro de {nome_tabela[:-1]}"):
         with st.form(f"form_add_{tipo}"):
-            dados_para_salvar = {}
+            dados_final = {}
             
             if tipo == "antenas":
-                # Colunas: antena_serie, modelo_antena, marca_sinal
-                serie = st.text_input("Número de Série (Antena)")
-                modelo = st.text_input("Modelo da Antena")
-                marca = st.text_input("Marca do Sinal")
-                dados_para_salvar = {
-                    "antena_serie": serie, 
-                    "modelo_antena": modelo, 
+                # Exatamente como na sua imagem: antena_serie, modelo_antena, marca_sinal
+                st.info("Campos da Tabela: Antenas")
+                serie = st.text_input("Antena Série", placeholder="Ex: PCS75UA...")
+                modelo = st.text_input("Modelo Antena", placeholder="Ex: Star Fire 7500")
+                marca = st.text_input("Marca Sinal", placeholder="Ex: John Deere")
+                
+                dados_final = {
+                    "antena_serie": serie,
+                    "modelo_antena": modelo,
                     "marca_sinal": marca
                 }
             
             elif tipo == "monitores":
-                # Colunas: monitor_serie, modelo_monitor
-                serie = st.text_input("Número de Série (Monitor)")
-                modelo = st.text_input("Modelo do Monitor")
-                dados_para_salvar = {
-                    "monitor_serie": serie, 
+                # Colunas reais da sua tabela Monitores
+                st.info("Campos da Tabela: Monitores")
+                serie = st.text_input("Monitor Série", placeholder="Ex: PCG5...")
+                modelo = st.text_input("Modelo Monitor", placeholder="Ex: G5 PLUS")
+                
+                dados_final = {
+                    "monitor_serie": serie,
                     "modelo_monitor": modelo
                 }
-            
+                
             elif tipo == "navs":
-                # Coluna: nav_serie
-                serie = st.text_input("Número de Série (NAV)")
-                dados_para_salvar = {"nav_serie": serie}
+                # Colunas reais da sua tabela Navs
+                st.info("Campos da Tabela: Navs")
+                serie = st.text_input("Nav Série")
+                
+                dados_final = {
+                    "nav_serie": serie
+                }
 
             if st.form_submit_button("Salvar no Banco"):
-                # Validação simples: precisa ter ao menos a série
-                valor_serie = dados_para_salvar.get(f"{tipo[:-1]}_serie")
+                # Validação: Não deixa salvar se a série estiver vazia
+                valor_serie = list(dados_final.values())[0] 
                 if valor_serie:
-                    if add_registro(nome_tabela, dados_para_salvar):
-                        st.success(f"{nome_tabela[:-1]} cadastrado com sucesso!")
+                    if add_registro(nome_tabela, dados_final):
+                        st.success("✅ Gravado com sucesso no Supabase!")
                         st.rerun()
                 else:
-                    st.error("O campo Número de Série é obrigatório.")
+                    st.error("O campo de Série é obrigatório para o cadastro.")
 
-    # --- LISTAGEM E PESQUISA ---
-    busca = st.text_input(f"🔍 Pesquisar em {nome_tabela}...")
+    # --- LISTAGEM COM OS NOMES DE COLUNA CORRETOS ---
+    st.write("---")
+    busca = st.text_input(f"🔍 Filtrar {nome_tabela}...")
     dados = get_tabela_simples(nome_tabela)
     
     if busca:
@@ -57,14 +67,21 @@ def render(go, tipo):
 
     for item in dados:
         with st.container(border=True):
-            # Lógica para exibir a série correta na lista
-            serie = item.get("antena_serie") or item.get("monitor_serie") or item.get("nav_serie")
-            # Lógica para exibir o modelo correto na lista
-            modelo = item.get("modelo_antena") or item.get("modelo_monitor")
+            # Lógica para mostrar os dados conforme a tabela
+            if tipo == "antenas":
+                st.markdown(f"**Série:** `{item.get('antena_serie')}`")
+                st.caption(f"📦 **Modelo:** {item.get('modelo_antena')} | 📡 **Marca:** {item.get('marca_sinal')}")
             
-            st.markdown(f"**Série:** `{serie}`")
-            if modelo: st.caption(f"📦 Modelo: {modelo}")
-            if item.get("marca_sinal"): st.caption(f"📡 Sinal: {item.get('marca_sinal')}")
+            elif tipo == "monitores":
+                st.markdown(f"**Série:** `{item.get('monitor_serie')}`")
+                st.caption(f"📦 **Modelo:** {item.get('modelo_monitor')}")
             
+            elif tipo == "navs":
+                st.markdown(f"**Série:** `{item.get('nav_serie')}`")
+            
+            # Status de uso (se está em algum equipamento)
             frota = item.get("codigo_do_equipamento")
-            st.caption(f"🚜 {'Frota: ' + str(frota) if frota else '✅ Disponível no Estoque'}")
+            if frota:
+                st.warning(f"🚜 Vinculado à Frota: {frota}")
+            else:
+                st.success("✅ Disponível em Estoque")
