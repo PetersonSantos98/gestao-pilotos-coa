@@ -1,6 +1,4 @@
-streamlit==1.56.0
-pandas==3.0.2
-supabase==2.28.3
-postgrest==2.28.3
-realtime==2.28.3
-httpx==0.28.1
+streamlit
+pandas
+supabase
+httpx
