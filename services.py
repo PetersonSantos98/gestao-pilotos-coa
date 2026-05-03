@@ -1,8 +1,8 @@
 import streamlit as st
 from supabase import create_client
 
-SUPABASE_URL = "SUA_URL"
-SUPABASE_KEY = "SUA_KEY"
+SUPABASE_URL = st.secrets["https://wjejxlnclrdpigpratrt.supabase.com"]
+SUPABASE_KEY = st.secrets["sb_publishable_TZrkyrcPDgaqcgTcZcmvPQ_UofXX50m"]
 
 @st.cache_resource
 def get_client():
