@@ -10,7 +10,7 @@ def go(page):
     st.session_state.page = page
     st.rerun()
 
-st.markdown("## 🚜")
+st.markdown("## ")
 
 p = st.session_state.page
 
