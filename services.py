@@ -5,7 +5,7 @@ import httpx
 # ================================
 # 🔐 CONFIG (USAR SECRETS)
 # ================================
-SUPABASE_URL = st.secrets["https://wjejxlnclrdpigpratrt.supabase.com"]
+SUPABASE_URL = st.secrets["https://wjejxlnclrdpigpratrt.supabase.co"]
 SUPABASE_KEY = st.secrets["sb_publishable_TZrkyrcPDgaqcgTcZcmvPQ_UofXX50m"]
 
 
