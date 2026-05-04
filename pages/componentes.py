@@ -15,7 +15,6 @@ def render(go, tipo):
             dados_final = {}
             
             if tipo == "antenas":
-                # Exatamente como na sua imagem: antena_serie, modelo_antena, marca_sinal
                 st.info("Campos da Tabela: Antenas")
                 serie = st.text_input("Antena Série", placeholder="Ex: PCS75UA...")
                 modelo = st.text_input("Modelo Antena", placeholder="Ex: Star Fire 7500")
@@ -28,7 +27,6 @@ def render(go, tipo):
                 }
             
             elif tipo == "monitores":
-                # Colunas reais da sua tabela Monitores
                 st.info("Campos da Tabela: Monitores")
                 serie = st.text_input("Monitor Série", placeholder="Ex: PCG5...")
                 modelo = st.text_input("Modelo Monitor", placeholder="Ex: G5 PLUS")
@@ -39,7 +37,6 @@ def render(go, tipo):
                 }
                 
             elif tipo == "navs":
-                # Colunas reais da sua tabela Navs
                 st.info("Campos da Tabela: Navs")
                 serie = st.text_input("Nav Série")
                 
