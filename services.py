@@ -6,7 +6,7 @@ def get_config():
         url = st.secrets["SUPABASE_URL"]
         key = st.secrets["SUPABASE_KEY"]
     except:
-        # Suas chaves de fallback
+        # Fallback para desenvolvimento
         url = "https://wjejxlnclrdpigpratrt.supabase.co"
         key = "sb_publishable_TZrkyrcPDgaqcgTcZcmvPQ_UofXX50m"
     return url, key
@@ -56,7 +56,7 @@ def get_licencas_simples():
         st.error(f"Erro ao buscar licenças: {e}")
         return []
 
-# --- CRUD ---
+# --- CRUD (Inserção e Atualização) ---
 
 def add_registro(tabela, dados):
     try:
