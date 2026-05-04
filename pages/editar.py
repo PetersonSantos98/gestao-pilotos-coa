@@ -1,12 +1,10 @@
 import streamlit as st
-import services  # Importação robusta para evitar ImportError
+import services
 
 def render(go):
     if st.button("⬅️ Cancelar"): go("frotas")
 
     id_edit = st.session_state.get("edit_id")
-    
-    # Busca dados via módulo services
     data = services.get_equipamentos()
     item = next((x for x in data if x["id"] == id_edit), None)
 
@@ -16,28 +14,56 @@ def render(go):
 
     st.subheader(f"Editando {item['codigo_do_equipamento']}")
 
-    # Busca componentes disponíveis chamando o módulo
+    # 1. Buscamos as opções disponíveis
     antenas_opt = services.get_itens_disponiveis("Antenas", "antena_serie", item["antena"])
     monitores_opt = services.get_itens_disponiveis("Monitores", "monitor_serie", item["monitor"])
     navs_opt = services.get_itens_disponiveis("Navs", "nav_serie", item["nav"])
 
+    # 2. Criamos um item padrão "Vazio" para cada lista
+    VAZIO = {"antena_serie": None, "modelo_antena": None, "marca_sinal": None, 
+             "monitor_serie": None, "modelo_monitor": None, "nav_serie": None}
+
     with st.form("form_edit"):
         nome = st.text_input("Nome", value=item["nome"])
         
-        antena = st.selectbox("Antena Disponível", options=antenas_opt, 
-                             format_func=lambda x: f"{x['antena_serie']} ({x['modelo_antena']})",
-                             index=next((i for i, x in enumerate(antenas_opt) if x["antena_serie"] == item["antena"]), 0))
+        # --- SELEÇÃO DE ANTENA ---
+        # Adicionamos a opção "Nenhum" no topo da lista
+        lista_antenas = [VAZIO] + antenas_opt
+        idx_antena = next((i for i, x in enumerate(lista_antenas) if x["antena_serie"] == item["antena"]), 0)
         
-        monitor = st.selectbox("Monitor Disponível", options=monitores_opt, 
-                              format_func=lambda x: f"{x['monitor_serie']} ({x['modelo_monitor']})",
-                              index=next((i for i, x in enumerate(monitores_opt) if x["monitor_serie"] == item["monitor"]), 0))
+        antena = st.selectbox(
+            "Antena", 
+            options=lista_antenas,
+            format_func=lambda x: f"{x['antena_serie']} ({x['modelo_antena']})" if x["antena_serie"] else "❌ Nenhum / Remover",
+            index=idx_antena
+        )
+
+        # --- SELEÇÃO DE MONITOR ---
+        lista_monitores = [VAZIO] + monitores_opt
+        idx_monitor = next((i for i, x in enumerate(lista_monitores) if x["monitor_serie"] == item["monitor"]), 0)
         
-        nav = st.selectbox("NAV Disponível", options=navs_opt, 
-                          format_func=lambda x: f"{x['nav_serie']}",
-                          index=next((i for i, x in enumerate(navs_opt) if x["nav_serie"] == item["nav"]), 0))
+        monitor = st.selectbox(
+            "Monitor", 
+            options=lista_monitores,
+            format_func=lambda x: f"{x['monitor_serie']} ({x['modelo_monitor']})" if x["monitor_serie"] else "❌ Nenhum / Remover",
+            index=idx_monitor
+        )
+
+        # --- SELEÇÃO DE NAV ---
+        lista_navs = [VAZIO] + navs_opt
+        idx_nav = next((i for i, x in enumerate(lista_navs) if x["nav_serie"] == item["nav"]), 0)
+        
+        nav = st.selectbox(
+            "NAV", 
+            options=lista_navs,
+            format_func=lambda x: f"{x['nav_serie']}" if x["nav_serie"] else "❌ Nenhum / Remover",
+            index=idx_nav
+        )
 
         if st.form_submit_button("💾 Salvar Alterações"):
-            sucesso = services.update_equipamento(id_edit, {
+            # Montamos o dicionário de atualização. 
+            # Se "Nenhum" for selecionado, os valores enviados serão None.
+            payload = {
                 "nome": nome,
                 "antena": antena["antena_serie"],
                 "modelo_antena": antena["modelo_antena"],
@@ -45,7 +71,8 @@ def render(go):
                 "monitor": monitor["monitor_serie"],
                 "modelo_monitor": monitor["modelo_monitor"],
                 "nav": nav["nav_serie"]
-            })
-            if sucesso:
-                st.success("Dados atualizados!")
+            }
+            
+            if services.update_equipamento(id_edit, payload):
+                st.success("Equipamento atualizado com sucesso!")
                 go("frotas")
