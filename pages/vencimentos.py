@@ -1,5 +1,5 @@
 import streamlit as st
-from services import get_licencas_simples, get_equipamentos
+import services  # Importação robusta para evitar ImportError
 from utils import formatar_data
 
 def render(go):
@@ -15,8 +15,10 @@ def render(go):
     st.subheader("🔔 Controle de Vencimentos")
     
     busca = st.text_input("🔍 Pesquisar Licença...")
-    licencas = get_licencas_simples()
-    equipamentos = get_equipamentos()
+    
+    # Chamadas via módulo services
+    licencas = services.get_licencas_simples()
+    equipamentos = services.get_equipamentos()
 
     if busca:
         licencas = [l for l in licencas if busca.lower() in str(l.get("licenca")).lower()]
@@ -25,11 +27,11 @@ def render(go):
         num_licenca = str(item.get("licenca"))
         data_fmt, status = formatar_data(item.get("data_vencimento"))
         
-        # Procura onde está a licença
+        # Procura onde está a licença na frota
         vinc = next((e for e in equipamentos if num_licenca in [str(e.get("antena")), str(e.get("monitor")), str(e.get("nav"))]), None)
 
         with st.container(border=True):
-            c1, c2 = st.columns([3, 1.2]) # Ajustado para caber o botão editar
+            c1, c2 = st.columns([3, 1.2])
             with c1:
                 st.markdown(f"**Série:** `{num_licenca}`")
                 st.caption(f"📍 {f'Frota: {vinc.get('codigo_do_equipamento')}' if vinc else 'Estoque'}")
@@ -37,7 +39,6 @@ def render(go):
                 cor = "red" if status == "val-expirada" else "orange" if status == "val-atencao" else "green"
                 st.markdown(f"<p style='color:{cor}; font-weight:bold; text-align:right; margin-bottom: 5px;'>{data_fmt}</p>", unsafe_allow_html=True)
                 
-                # Botão para editar a licença
                 if st.button("📝 Editar", key=f"edit_lic_{item.get('id')}", use_container_width=True):
                     st.session_state.licenca_edit = item
                     go("gerir_licenca")
