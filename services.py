@@ -22,7 +22,8 @@ def verificar_login(usuario, senha):
     """Verifica se as credenciais existem na tabela 'usuarios'."""
     try:
         supabase = get_client()
-        res = supabase.table("usuarios").select("*").eq("usuario", usuario).eq("senha", senha).execute()
+        # Alterado de "usuario" para "usuarios" para bater com seu banco
+        res = supabase.table("usuarios").select("*").eq("usuarios", usuario).eq("senha", senha).execute()
         return len(res.data) > 0
     except Exception as e:
         st.error(f"Erro na autenticação: {e}")
