@@ -1,11 +1,11 @@
 import streamlit as st
 from pages import home, frotas, editar, vencimentos, componentes, adicionar_frota, gerir_licenca
-import services  # Importação robusta para evitar erro de cache
+import services  # Importação robusta
 
 # Configuração de Layout
 st.set_page_config(page_title="Gestão de Componentes", layout="centered")
 
-# Inicialização de variáveis de estado
+# Inicialização do Estado de Sessão
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
 
@@ -21,7 +21,7 @@ if not st.session_state.autenticado:
     st.markdown("""
         <style>
         .block-container { max-width: 400px !important; padding-top: 5rem !important; margin: auto; }
-        div.stButton > button { width: 100%; border-radius: 12px; height: 3.5em; font-weight: bold; background-color: #1E1E1E; color: white; }
+        div.stButton > button { width: 100%; border-radius: 12px; height: 3.5em; font-weight: bold; background-color: #2E2E2E; color: white; }
         </style>
     """, unsafe_allow_html=True)
     
@@ -31,19 +31,19 @@ if not st.session_state.autenticado:
         user = st.text_input("Usuário")
         password = st.text_input("Senha", type="password")
         
-        if st.button("Entrar"):
-            # Chamada usando o prefixo do módulo
+        if st.button("Entrar na Plataforma"):
+            # Chamada via módulo para evitar erros de importação
             if services.verificar_login(user, password):
                 st.session_state.autenticado = True
                 st.rerun()
             else:
-                st.error("Credenciais inválidas. Tente novamente.")
-    st.stop()  # Impede que o restante do código seja lido sem login
+                st.error("Usuário ou senha incorretos")
+    st.stop() # Bloqueia o app aqui até autenticar
 
-# --- ÁREA AUTENTICADA ---
+# --- ÁREA LOGADA ---
 
-# Barra lateral para Logoff
-if st.sidebar.button("Sair / Logoff"):
+# Botão de Logoff na barra lateral
+if st.sidebar.button("🚪 Sair do Sistema"):
     st.session_state.autenticado = False
     st.rerun()
 
@@ -51,7 +51,7 @@ st.markdown("## ")
 
 p = st.session_state.page
 
-# Roteador de Páginas
+# Roteador de Navegação
 if p == "home":
     home.render(go)
 elif p == "frotas":
