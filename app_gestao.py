@@ -1,5 +1,6 @@
 import streamlit as st
-from pages import home, frotas, editar, vencimentos, componentes, adicionar_frota
+# Adicionada a importação de gerir_licenca
+from pages import home, frotas, editar, vencimentos, componentes, adicionar_frota, gerir_licenca
 
 st.set_page_config(page_title="Gestão de Componentes", layout="centered")
 
@@ -24,5 +25,8 @@ elif p == "vencimentos":
     vencimentos.render(go)
 elif p == "adicionar_frota":
     adicionar_frota.render(go)
+# Adicionada a rota para a gestão de licenças
+elif p == "gerir_licenca":
+    gerir_licenca.render(go)
 elif p in ["antenas", "monitores", "navs"]:
     componentes.render(go, p)
