@@ -2,17 +2,19 @@ import streamlit as st
 from supabase import create_client
 
 def get_config():
+    """Recupera as credenciais do Supabase."""
     try:
         url = st.secrets["SUPABASE_URL"]
         key = st.secrets["SUPABASE_KEY"]
     except:
-        # Fallback para chaves manuais (Development)
+        # Fallback para ambiente de desenvolvimento local
         url = "https://wjejxlnclrdpigpratrt.supabase.co"
         key = "sb_publishable_TZrkyrcPDgaqcgTcZcmvPQ_UofXX50m"
     return url, key
 
 @st.cache_resource
 def get_client():
+    """Cria e armazena o cliente de conexão com o banco."""
     url, key = get_config()
     return create_client(url, key)
 
@@ -22,14 +24,14 @@ def verificar_login(usuario, senha):
     """Verifica se as credenciais existem na tabela 'usuarios'."""
     try:
         supabase = get_client()
-        # Alterado de "usuario" para "usuarios" para bater com seu banco
+        # Ajustado para a coluna 'usuarios' (plural) conforme seu banco de dados
         res = supabase.table("usuarios").select("*").eq("usuarios", usuario).eq("senha", senha).execute()
         return len(res.data) > 0
     except Exception as e:
         st.error(f"Erro na autenticação: {e}")
         return False
 
-# --- BUSCAS GERAIS (Para listagens e filtros) ---
+# --- BUSCAS GERAIS ---
 
 def get_tabela_simples(tabela):
     """Busca todos os dados de uma tabela específica."""
@@ -60,49 +62,61 @@ def get_licencas_simples():
         st.error(f"Erro ao buscar licenças: {e}")
         return []
 
-# --- LÓGICA DE DISPONIBILIDADE ---
+# --- LÓGICA DE DISPONIBILIDADE (CORRIGIDA) ---
 
 def get_itens_disponiveis(tabela, coluna_serie, valor_atual=None):
-    """Retorna itens que não estão em uso em nenhum equipamento."""
+    """
+    Retorna apenas itens que NÃO estão vinculados a nenhuma frota.
+    Garante exclusividade: se o item está em um trator, não aparece para outro.
+    """
     try:
         supabase = get_client()
-        todos = get_tabela_simples(tabela)
         
-        # Define qual coluna olhar na tabela Equipamentos com base na tabela de origem
-        vinc_map = {"Antenas": "antena", "Monitores": "monitor", "NAVs": "nav"}
-        col_vinc = vinc_map.get(tabela)
+        # 1. Busca todos os componentes cadastrados (Antenas, Monitores ou Navs)
+        todos_itens = get_tabela_simples(tabela)
         
-        if not col_vinc:
-            return todos
+        # 2. Busca todos os registros da frota para identificar o que já está em uso
+        res_vinculados = supabase.table("Equipamentos").select("antena, monitor, nav").execute()
+        
+        # Criamos um conjunto de séries ocupadas para busca rápida
+        series_ocupadas = set()
+        for eq in res_vinculados.data:
+            if eq.get('antena'): series_ocupadas.add(str(eq['antena']))
+            if eq.get('monitor'): series_ocupadas.add(str(eq['monitor']))
+            if eq.get('nav'): series_ocupadas.add(str(eq['nav']))
 
-        em_uso = supabase.table("Equipamentos").select(col_vinc).execute().data
-        series_em_uso = [str(x[col_vinc]) for x in em_uso if x[col_vinc]]
-
-        return [item for item in todos if str(item[coluna_serie]) not in series_em_uso or str(item[coluna_serie]) == str(valor_atual)]
+        # 3. Filtra a lista: mantém se não estiver ocupado OU se for o item que já pertence ao trator atual
+        disponiveis = [
+            item for item in todos_itens 
+            if str(item[coluna_serie]) not in series_ocupadas 
+            or str(item[coluna_serie]) == str(valor_atual)
+        ]
+        
+        return disponiveis
     except Exception as e:
-        st.error(f"Erro na disponibilidade: {e}")
+        st.error(f"Erro ao filtrar disponibilidade: {e}")
         return []
 
 # --- CRUD (Inserção e Atualização) ---
 
 def add_registro(tabela, dados):
-    """Insere dados respeitando as colunas do banco."""
+    """Insere um novo registro em qualquer tabela."""
     try:
         supabase = get_client()
         supabase.table(tabela).insert(dados).execute()
-        st.cache_data.clear() # Limpa o cache para refletir a mudança
+        st.cache_data.clear() # Limpa o cache para atualizar as listas
         return True
     except Exception as e:
         st.error(f"Erro ao inserir no banco: {e}")
         return False
 
 def update_equipamento(equip_id, dados):
-    """Atualiza os dados da frota."""
+    """Atualiza os dados de um trator da frota."""
     try:
         supabase = get_client()
         supabase.table("Equipamentos").update(dados).eq("id", equip_id).execute()
-        st.cache_data.clear() # Limpa o cache para refletir a mudança
+        st.cache_data.clear() # Limpa o cache para atualizar as listas
         return True
     except Exception as e:
-        st.error(f"Erro ao atualizar: {e}")
+        st.error(f"Erro ao atualizar equipamento: {e}")
         return False
