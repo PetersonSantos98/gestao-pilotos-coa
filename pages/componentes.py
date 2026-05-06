@@ -1,15 +1,20 @@
 import streamlit as st
-from services import get_tabela_simples, add_registro
+from services import get_itens_com_status, add_registro
 
 def render(go, tipo):
     if st.button("⬅️ Voltar"): go("home")
     
     # Mapeamento para garantir que usamos os nomes das tabelas do banco
     tabelas = {"antenas": "Antenas", "monitores": "Monitores", "navs": "Navs"}
+    # Identifica qual a coluna de série correta para cada tabela
+    colunas_serie = {"antenas": "antena_serie", "monitores": "monitor_serie", "navs": "nav_serie"}
+    
     nome_tabela = tabelas.get(tipo)
+    coluna_id = colunas_serie.get(tipo)
+    
     st.subheader(f"📋 Gestão de {nome_tabela}")
 
-    # --- FORMULÁRIO DE CADASTRO ESPECÍFICO ---
+    # --- FORMULÁRIO DE CADASTRO ---
     with st.expander(f"➕ Novo Cadastro de {nome_tabela[:-1]}"):
         with st.form(f"form_add_{tipo}"):
             dados_final = {}
@@ -45,26 +50,30 @@ def render(go, tipo):
                 }
 
             if st.form_submit_button("Salvar no Banco"):
-                # Validação: Não deixa salvar se a série estiver vazia
-                valor_serie = list(dados_final.values())[0] 
+                valor_serie = dados_final.get(coluna_id)
                 if valor_serie:
                     if add_registro(nome_tabela, dados_final):
                         st.success("✅ Gravado com sucesso no Supabase!")
                         st.rerun()
                 else:
-                    st.error("O campo de Série é obrigatório para o cadastro.")
+                    st.error("O campo de Série é obrigatório.")
 
-    # --- LISTAGEM COM OS NOMES DE COLUNA CORRETOS ---
+    # --- LISTAGEM COM RASTREAMENTO DE VÍNCULO ---
     st.write("---")
     busca = st.text_input(f"🔍 Filtrar {nome_tabela}...")
-    dados = get_tabela_simples(nome_tabela)
+    
+    # AQUI ESTÁ A MÁGICA: busca os dados já cruzados com a frota
+    dados = get_itens_com_status(nome_tabela, coluna_id)
     
     if busca:
         dados = [d for d in dados if any(busca.lower() in str(v).lower() for v in d.values())]
 
+    if not dados:
+        st.info(f"Nenhum registro encontrado em {nome_tabela}.")
+
     for item in dados:
         with st.container(border=True):
-            # Lógica para mostrar os dados conforme a tabela
+            # 1. Exibição dos dados técnicos
             if tipo == "antenas":
                 st.markdown(f"**Série:** `{item.get('antena_serie')}`")
                 st.caption(f"📦 **Modelo:** {item.get('modelo_antena')} | 📡 **Marca:** {item.get('marca_sinal')}")
@@ -76,9 +85,11 @@ def render(go, tipo):
             elif tipo == "navs":
                 st.markdown(f"**Série:** `{item.get('nav_serie')}`")
             
-            # Status de uso (se está em algum equipamento)
-            frota = item.get("codigo_do_equipamento")
-            if frota:
-                st.warning(f"🚜 Vinculado à Frota: {frota}")
+            # 2. Exibição do Status de Vínculo (Lógica igual ao Vencimento)
+            # O campo 'vinculo' é injetado pela função get_itens_com_status no services.py
+            trator_dono = item.get("vinculo")
+            
+            if trator_dono:
+                st.error(f"🚜 Ocupado em Frota: **{trator_dono}**")
             else:
                 st.success("✅ Disponível em Estoque")
