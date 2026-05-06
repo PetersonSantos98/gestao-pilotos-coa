@@ -7,7 +7,6 @@ def get_config():
         url = st.secrets["SUPABASE_URL"]
         key = st.secrets["SUPABASE_KEY"]
     except:
-        # Fallback para ambiente de desenvolvimento local
         url = "https://wjejxlnclrdpigpratrt.supabase.co"
         key = "sb_publishable_TZrkyrcPDgaqcgTcZcmvPQ_UofXX50m"
     return url, key
@@ -21,20 +20,51 @@ def get_client():
 # --- SISTEMA DE AUTENTICAÇÃO ---
 
 def verificar_login(usuario, senha):
-    """Verifica se as credenciais existem na tabela 'usuarios'."""
     try:
         supabase = get_client()
-        # Ajustado para a coluna 'usuarios' (plural) conforme seu banco de dados
         res = supabase.table("usuarios").select("*").eq("usuarios", usuario).eq("senha", senha).execute()
         return len(res.data) > 0
     except Exception as e:
         st.error(f"Erro na autenticação: {e}")
         return False
 
-# --- BUSCAS GERAIS ---
+# --- BUSCA INTELIGENTE (COM RELACIONAMENTOS) ---
+
+@st.cache_data(ttl=60)
+def get_equipamentos():
+    """
+    Busca a frota completa trazendo AUTOMATICAMENTE os modelos e vencimentos
+    através das Foreign Keys configuradas no banco.
+    """
+    try:
+        supabase = get_client()
+        # Esta query pede os dados do trator + dados das tabelas vinculadas
+        query = """
+            id,
+            codigo_do_equipamento,
+            nome,
+            antena,
+            Antenas (
+                modelo_antena,
+                marca_sinal,
+                Licencas_Validades (data_vencimento)
+            ),
+            monitor,
+            Monitores (
+                modelo_monitor,
+                Licencas_Validades (data_vencimento)
+            ),
+            nav
+        """
+        res = supabase.table("Equipamentos").select(query).order("codigo_do_equipamento").execute()
+        return res.data or []
+    except Exception as e:
+        st.error(f"Erro ao buscar frota sincronizada: {e}")
+        return []
+
+# --- DISPONIBILIDADE E AUXILIARES ---
 
 def get_tabela_simples(tabela):
-    """Busca todos os dados de uma tabela específica."""
     try:
         supabase = get_client()
         return supabase.table(tabela).select("*").execute().data or []
@@ -42,81 +72,55 @@ def get_tabela_simples(tabela):
         st.error(f"Erro na tabela {tabela}: {e}")
         return []
 
-@st.cache_data(ttl=60)
-def get_equipamentos():
-    """Busca a frota completa ordenada pelo prefixo."""
-    try:
-        supabase = get_client()
-        return supabase.table("Equipamentos").select("*").order("codigo_do_equipamento").execute().data or []
-    except Exception as e:
-        st.error(f"Erro ao buscar equipamentos: {e}")
-        return []
-
-@st.cache_data(ttl=60)
-def get_licencas_simples():
-    """Busca licenças para a página de vencimentos."""
-    try:
-        supabase = get_client()
-        return supabase.table("Licencas_Validades").select("*").order("data_vencimento").execute().data or []
-    except Exception as e:
-        st.error(f"Erro ao buscar licenças: {e}")
-        return []
-
-# --- LÓGICA DE DISPONIBILIDADE (CORRIGIDA) ---
-
 def get_itens_disponiveis(tabela, coluna_serie, valor_atual=None):
-    """
-    Retorna apenas itens que NÃO estão vinculados a nenhuma frota.
-    Garante exclusividade: se o item está em um trator, não aparece para outro.
-    """
+    """Filtra itens que não estão em uso em nenhum trator."""
     try:
         supabase = get_client()
-        
-        # 1. Busca todos os componentes cadastrados (Antenas, Monitores ou Navs)
         todos_itens = get_tabela_simples(tabela)
         
-        # 2. Busca todos os registros da frota para identificar o que já está em uso
+        # Verifica quem já está ocupado na frota
         res_vinculados = supabase.table("Equipamentos").select("antena, monitor, nav").execute()
         
-        # Criamos um conjunto de séries ocupadas para busca rápida
         series_ocupadas = set()
         for eq in res_vinculados.data:
             if eq.get('antena'): series_ocupadas.add(str(eq['antena']))
             if eq.get('monitor'): series_ocupadas.add(str(eq['monitor']))
             if eq.get('nav'): series_ocupadas.add(str(eq['nav']))
 
-        # 3. Filtra a lista: mantém se não estiver ocupado OU se for o item que já pertence ao trator atual
-        disponiveis = [
+        return [
             item for item in todos_itens 
             if str(item[coluna_serie]) not in series_ocupadas 
             or str(item[coluna_serie]) == str(valor_atual)
         ]
-        
-        return disponiveis
     except Exception as e:
-        st.error(f"Erro ao filtrar disponibilidade: {e}")
+        st.error(f"Erro na disponibilidade: {e}")
         return []
 
-# --- CRUD (Inserção e Atualização) ---
+# --- CRUD ATUALIZADO ---
 
 def add_registro(tabela, dados):
-    """Insere um novo registro em qualquer tabela."""
     try:
         supabase = get_client()
         supabase.table(tabela).insert(dados).execute()
-        st.cache_data.clear() # Limpa o cache para atualizar as listas
+        st.cache_data.clear()
         return True
     except Exception as e:
-        st.error(f"Erro ao inserir no banco: {e}")
+        st.error(f"Erro ao inserir: {e}")
         return False
 
 def update_equipamento(equip_id, dados):
-    """Atualiza os dados de um trator da frota."""
+    """
+    Atualiza o trator. Como o banco é relacional, enviamos apenas 
+    os números de série. O Supabase cuida do resto.
+    """
     try:
         supabase = get_client()
-        supabase.table("Equipamentos").update(dados).eq("id", equip_id).execute()
-        st.cache_data.clear() # Limpa o cache para atualizar as listas
+        # Removemos chaves vazias para não sobrescrever com NULL por erro
+        dados_limpos = {k: v for k, v in dados.items() if v is not None}
+        
+        supabase.table("Equipamentos").update(dados_limpos).eq("id", equip_id).execute()
+        st.cache_data.clear() 
         return True
     except Exception as e:
-        st.error(f"Erro ao atualizar equipamento: {e}")
+        st.error(f"Erro ao atualizar trator: {e}")
         return False
