@@ -19,7 +19,7 @@ def render(go):
     monitores_opt = services.get_itens_disponiveis("Monitores", "monitor_serie", item["monitor"])
     navs_opt = services.get_itens_disponiveis("Navs", "nav_serie", item["nav"])
 
-    # 2. Criamos um item padrão "Vazio" para cada lista
+    # 2. Criamos um item padrão "Vazio" simplificado
     VAZIO = {"antena_serie": None, "modelo_antena": None, "marca_sinal": None, 
              "monitor_serie": None, "modelo_monitor": None, "nav_serie": None}
 
@@ -27,7 +27,6 @@ def render(go):
         nome = st.text_input("Nome", value=item["nome"])
         
         # --- SELEÇÃO DE ANTENA ---
-        # Adicionamos a opção "Nenhum" no topo da lista
         lista_antenas = [VAZIO] + antenas_opt
         idx_antena = next((i for i, x in enumerate(lista_antenas) if x["antena_serie"] == item["antena"]), 0)
         
@@ -61,18 +60,15 @@ def render(go):
         )
 
         if st.form_submit_button("💾 Salvar Alterações"):
-            # Montamos o dicionário de atualização. 
-            # Se "Nenhum" for selecionado, os valores enviados serão None.
+            # --- CORREÇÃO AQUI ---
+            # Enviamos apenas as colunas que REALMENTE existem na tabela Equipamentos
             payload = {
                 "nome": nome,
                 "antena": antena["antena_serie"],
-                "modelo_antena": antena["modelo_antena"],
-                "marca_do_sinal": antena["marca_sinal"],
                 "monitor": monitor["monitor_serie"],
-                "modelo_monitor": monitor["modelo_monitor"],
                 "nav": nav["nav_serie"]
             }
             
             if services.update_equipamento(id_edit, payload):
                 st.success("Equipamento atualizado com sucesso!")
-                go("frotas")
+                st.rerun() # Use rerun para atualizar a tela e limpar o cache visual
