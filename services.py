@@ -2,69 +2,49 @@ import streamlit as st
 from supabase import create_client
 
 def get_config():
-    """Recupera as credenciais do Supabase."""
     try:
         url = st.secrets["SUPABASE_URL"]
         key = st.secrets["SUPABASE_KEY"]
     except:
-        # Fallback para ambiente de desenvolvimento local
         url = "https://wjejxlnclrdpigpratrt.supabase.co"
         key = "sb_publishable_TZrkyrcPDgaqcgTcZcmvPQ_UofXX50m"
     return url, key
 
 @st.cache_resource
 def get_client():
-    """Cria e armazena o cliente de conexão com o banco."""
     url, key = get_config()
     return create_client(url, key)
 
-# --- SISTEMA DE AUTENTICAÇÃO ---
+# --- BUSCAS ---
 
-def verificar_login(usuario, senha):
-    """Verifica se as credenciais existem na tabela 'usuarios'."""
-    try:
-        supabase = get_client()
-        res = supabase.table("usuarios").select("*").eq("usuarios", usuario).eq("senha", senha).execute()
-        return len(res.data) > 0
-    except Exception as e:
-        st.error(f"Erro na autenticação: {e}")
-        return False
-
-# --- BUSCAS GERAIS E RELACIONAIS ---
-
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=10) # TTL baixo para você ver as mudanças rápido
 def get_equipamentos():
-    """
-    Busca a frota trazendo AUTOMATICAMENTE os modelos das tabelas vinculadas.
-    Nota: A data de vencimento é cruzada via código para evitar erros de FK.
-    """
+    """Busca a frota e os modelos das peças separadamente para evitar erro PGRST200."""
     try:
         supabase = get_client()
-        # Query limpa: Trator + Modelo da Antena + Modelo do Monitor
-        query = """
-            id,
-            codigo_do_equipamento,
-            nome,
-            antena,
-            Antenas (
-                modelo_antena,
-                marca_sinal
-            ),
-            monitor,
-            Monitores (
-                modelo_monitor
-            ),
-            nav
-        """
+        # Buscamos apenas os dados que existem com certeza
+        query = "id, codigo_do_equipamento, nome, antena, monitor, nav"
         res = supabase.table("Equipamentos").select(query).order("codigo_do_equipamento").execute()
-        return res.data or []
+        
+        # Agora buscamos os modelos para cruzar no código
+        antenas = {a['antena_serie']: a for a in supabase.table("Antenas").select("*").execute().data}
+        monitores = {m['monitor_serie']: m for m in supabase.table("Monitores").select("*").execute().data}
+        
+        dados_completos = []
+        for eq in res.data:
+            # Anexamos os modelos manualmente
+            eq['info_antena'] = antenas.get(eq['antena'], {})
+            eq['info_monitor'] = monitores.get(eq['monitor'], {})
+            dados_completos.append(eq)
+            
+        return dados_completos
     except Exception as e:
-        st.error(f"Erro ao buscar frota sincronizada: {e}")
+        st.error(f"Erro ao buscar frota: {e}")
         return []
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=10)
 def get_licencas_simples():
-    """Busca todas as licenças para a página de vencimentos e cruzamento de dados."""
+    """Resolve o AttributeError da sua imagem image_5d06f2.png"""
     try:
         supabase = get_client()
         res = supabase.table("Licencas_Validades").select("*").order("data_vencimento").execute()
@@ -73,71 +53,32 @@ def get_licencas_simples():
         st.error(f"Erro ao buscar licenças: {e}")
         return []
 
-def get_tabela_simples(tabela):
-    """Busca todos os dados de uma tabela específica (Antenas, Monitores, Navs)."""
-    try:
-        supabase = get_client()
-        return supabase.table(tabela).select("*").execute().data or []
-    except Exception as e:
-        st.error(f"Erro na tabela {tabela}: {e}")
-        return []
-
-# --- LÓGICA DE DISPONIBILIDADE ---
+# --- AUXILIARES ---
 
 def get_itens_disponiveis(tabela, coluna_serie, valor_atual=None):
-    """
-    Retorna itens que NÃO estão vinculados a nenhuma frota.
-    Permite que o item atual do trator apareça na lista de edição.
-    """
     try:
         supabase = get_client()
-        todos_itens = get_tabela_simples(tabela)
+        todos = supabase.table(tabela).select("*").execute().data or []
+        ocupados = supabase.table("Equipamentos").select("antena, monitor, nav").execute().data
         
-        # Busca o que já está em uso
-        res_vinculados = supabase.table("Equipamentos").select("antena, monitor, nav").execute()
+        series_em_uso = set()
+        for o in ocupados:
+            for k in o: 
+                if o[k]: series_em_uso.add(str(o[k]))
         
-        series_ocupadas = set()
-        for eq in res_vinculados.data:
-            if eq.get('antena'): series_ocupadas.add(str(eq['antena']))
-            if eq.get('monitor'): series_ocupadas.add(str(eq['monitor']))
-            if eq.get('nav'): series_ocupadas.add(str(eq['nav']))
-
-        return [
-            item for item in todos_itens 
-            if str(item[coluna_serie]) not in series_ocupadas 
-            or str(item[coluna_serie]) == str(valor_atual)
-        ]
-    except Exception as e:
-        st.error(f"Erro ao filtrar disponibilidade: {e}")
+        return [i for i in todos if str(i[coluna_serie]) not in series_em_uso or str(i[coluna_serie]) == str(valor_atual)]
+    except:
         return []
 
-# --- CRUD (Inserção e Atualização) ---
-
-def add_registro(tabela, dados):
-    """Insere um novo registro em qualquer tabela."""
+def update_equipamento(equip_id, dados):
     try:
         supabase = get_client()
-        supabase.table(tabela).insert(dados).execute()
+        # Filtro de segurança: só envia o que a tabela Equipamentos realmente tem
+        colunas_reais = ["nome", "antena", "monitor", "nav"]
+        payload = {k: v for k, v in dados.items() if k in colunas_reais}
+        supabase.table("Equipamentos").update(payload).eq("id", equip_id).execute()
         st.cache_data.clear()
         return True
     except Exception as e:
-        st.error(f"Erro ao inserir no banco: {e}")
-        return False
-
-def update_equipamento(equip_id, dados):
-    """
-    Atualiza os dados de um trator.
-    Envia apenas as colunas que restaram na tabela Equipamentos (nome e séries).
-    """
-    try:
-        supabase = get_client()
-        # Garante que não estamos enviando colunas que foram deletadas do banco
-        colunas_permitidas = ["nome", "antena", "monitor", "nav"]
-        payload = {k: v for k, v in dados.items() if k in colunas_permitidas}
-        
-        supabase.table("Equipamentos").update(payload).eq("id", equip_id).execute()
-        st.cache_data.clear() 
-        return True
-    except Exception as e:
-        st.error(f"Erro ao atualizar equipamento: {e}")
+        st.error(f"Erro no banco: {e}")
         return False
