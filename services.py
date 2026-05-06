@@ -7,33 +7,34 @@ def get_config():
         url = st.secrets["SUPABASE_URL"]
         key = st.secrets["SUPABASE_KEY"]
     except:
+        # Fallback para desenvolvimento
         url = "https://wjejxlnclrdpigpratrt.supabase.co"
         key = "sb_publishable_TZrkyrcPDgaqcgTcZcmvPQ_UofXX50m"
     return url, key
 
 @st.cache_resource
 def get_client():
-    """Cria o cliente de conexão."""
+    """Cria o cliente de conexão com o Supabase."""
     url, key = get_config()
     return create_client(url, key)
 
-# --- BUSCAS DE DADOS ---
+# --- BUSCAS DE DADOS (COM INTELIGÊNCIA DE STATUS) ---
 
 @st.cache_data(ttl=10)
 def get_equipamentos():
-    """Busca a frota e anexa modelos manualmente para evitar erros de relacionamento no banco."""
+    """Busca a frota e anexa os modelos das peças via Python para evitar erros de relacionamento."""
     try:
         supabase = get_client()
-        # Busca básica na tabela de frotas
+        # Busca básica na tabela de Equipamentos
         res = supabase.table("Equipamentos").select("id, codigo_do_equipamento, nome, antena, monitor, nav").order("codigo_do_equipamento").execute()
         
-        # Busca dados auxiliares para fazer o 'join' no Python
+        # Busca dados auxiliares das peças
         antenas = {a['antena_serie']: a for a in supabase.table("Antenas").select("*").execute().data}
         monitores = {m['monitor_serie']: m for m in supabase.table("Monitores").select("*").execute().data}
         
         dados_completos = []
         for eq in res.data:
-            # Anexa as informações das outras tabelas se o número de série existir
+            # Vincula os dados das peças ao trator
             eq['Antenas'] = antenas.get(eq['antena'], {})
             eq['Monitores'] = monitores.get(eq['monitor'], {})
             dados_completos.append(eq)
@@ -44,8 +45,38 @@ def get_equipamentos():
         return []
 
 @st.cache_data(ttl=10)
+def get_itens_com_status(tabela, coluna_serie):
+    """
+    Busca todas as peças e identifica quais estão em uso na frota.
+    Resolve o problema das peças aparecerem todas como 'disponíveis'.
+    """
+    try:
+        supabase = get_client()
+        # 1. Busca todas as peças da tabela (Antenas, Monitores ou Navs)
+        pecas = supabase.table(tabela).select("*").execute().data or []
+        
+        # 2. Busca o que está registrado na frota atual
+        frota = supabase.table("Equipamentos").select("antena, monitor, nav").execute().data
+        
+        # Criamos um conjunto de séries ocupadas para comparação rápida
+        series_ocupadas = set()
+        for trator in frota:
+            if trator.get('antena'): series_ocupadas.add(str(trator['antena']))
+            if trator.get('monitor'): series_ocupadas.add(str(trator['monitor']))
+            if trator.get('nav'): series_ocupadas.add(str(trator['nav']))
+
+        # 3. Define o status de disponibilidade
+        for p in pecas:
+            p['disponivel'] = str(p.get(coluna_serie)) not in series_ocupadas
+            
+        return pecas
+    except Exception as e:
+        st.error(f"Erro ao processar status: {e}")
+        return []
+
+@st.cache_data(ttl=10)
 def get_licencas_simples():
-    """Recupera as licenças para a página de vencimentos."""
+    """Busca as licenças para a página de vencimentos."""
     try:
         supabase = get_client()
         res = supabase.table("Licencas_Validades").select("*").order("data_vencimento").execute()
@@ -56,7 +87,7 @@ def get_licencas_simples():
 
 @st.cache_data(ttl=10)
 def get_tabela_simples(tabela):
-    """Busca todos os dados de uma tabela. Necessário para a página de componentes."""
+    """Busca dados brutos de qualquer tabela auxiliar."""
     try:
         supabase = get_client()
         return supabase.table(tabela).select("*").execute().data or []
@@ -64,26 +95,18 @@ def get_tabela_simples(tabela):
         st.error(f"Erro na tabela {tabela}: {e}")
         return []
 
-# --- LÓGICA DE NEGÓCIO E CRUD ---
+# --- OPERAÇÕES DE BANCO (CRUD) ---
 
 def get_itens_disponiveis(tabela, coluna_serie, valor_atual=None):
-    """Filtra itens que não estão em uso em nenhum equipamento."""
+    """Filtra itens para o SELECT de edição, permitindo a peça atual do trator."""
     try:
-        todos = get_tabela_simples(tabela)
-        supabase = get_client()
-        ocupados = supabase.table("Equipamentos").select("antena, monitor, nav").execute().data
-        
-        series_em_uso = set()
-        for o in ocupados:
-            for k in o: 
-                if o[k]: series_em_uso.add(str(o[k]))
-        
-        return [i for i in todos if str(i[coluna_serie]) not in series_em_uso or str(i[coluna_serie]) == str(valor_atual)]
+        todos = get_itens_com_status(tabela, coluna_serie)
+        return [i for i in todos if i['disponivel'] or str(i[coluna_serie]) == str(valor_atual)]
     except:
         return []
 
 def add_registro(tabela, dados):
-    """Adiciona um novo registro (Antena, Monitor, NAV ou Licença)."""
+    """Insere novos registros (Antenas, Monitores, etc)."""
     try:
         supabase = get_client()
         supabase.table(tabela).insert(dados).execute()
@@ -94,7 +117,7 @@ def add_registro(tabela, dados):
         return False
 
 def update_equipamento(equip_id, dados):
-    """Atualiza o equipamento enviando apenas colunas existentes para evitar erros de cache."""
+    """Atualiza o equipamento filtrando apenas colunas que existem na tabela."""
     try:
         supabase = get_client()
         colunas_validas = ["nome", "antena", "monitor", "nav"]
@@ -108,7 +131,7 @@ def update_equipamento(equip_id, dados):
         return False
 
 def verificar_login(usuario, senha):
-    """Autenticação simples."""
+    """Validação de acesso."""
     try:
         supabase = get_client()
         res = supabase.table("usuarios").select("*").eq("usuarios", usuario).eq("senha", senha).execute()
