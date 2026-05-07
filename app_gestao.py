@@ -25,7 +25,7 @@ if not st.session_state.autenticado:
         </style>
     """, unsafe_allow_html=True)
     
-    st.markdown("<h2 style='text-align: center;'>🔐 Acesso Restrito</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center;'>🔐 Bem Vindo!</h2>", unsafe_allow_html=True)
     
     with st.container(border=True):
         user = st.text_input("Usuário")
