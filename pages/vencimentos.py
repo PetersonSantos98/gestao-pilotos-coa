@@ -3,7 +3,6 @@ import services  # Importação robusta para evitar ImportError
 from utils import formatar_data
 
 def render(go):
-    # Cabeçalho com botões de ação
     col_v, col_n = st.columns([3, 1])
     with col_v:
         if st.button("⬅️ Voltar"): go("home")
