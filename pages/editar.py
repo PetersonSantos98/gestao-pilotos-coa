@@ -60,8 +60,6 @@ def render(go):
         )
 
         if st.form_submit_button("💾 Salvar Alterações"):
-            # --- CORREÇÃO AQUI ---
-            # Enviamos apenas as colunas que REALMENTE existem na tabela Equipamentos
             payload = {
                 "nome": nome,
                 "antena": antena["antena_serie"],
