@@ -18,7 +18,6 @@ if p == "home": home.render(go)
 elif p == "frotas": frotas.render(go)
 elif p == "editar": editar.render(go)
 elif p == "vencimentos": vencimentos.render(go)
-# Para as páginas de Antenas, Monitores e NAVs, criamos um renderizador genérico
 elif p in ["antenas", "monitores", "navs"]: 
     import pages.componentes as componentes
     componentes.render(go, p)
