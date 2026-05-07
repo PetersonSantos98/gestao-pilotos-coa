@@ -87,6 +87,13 @@ def render(go, tipo):
             trator_dono = item.get("vinculo")
             
             if trator_dono:
-               st.error(f"📍Frota: **{trator_dono}**")
-            else:
-                st.success("✅ Disponível em Estoque")
+               st.markdown(
+            f"""
+            <div style="background-color: #31333F; padding: 10px; border-radius: 5px; border-left: 5px solid #FF4B4B;">
+                📍 <b>Frota: {trator_dono}</b>
+            </div>
+            """, 
+            unsafe_allow_html=True
+        )
+    else:
+        st.success("✅ Disponível em Estoque")
