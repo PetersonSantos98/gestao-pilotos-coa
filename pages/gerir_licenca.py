@@ -40,15 +40,12 @@ def render(go):
             if not serie:
                 st.error("O número da licença é obrigatório.")
             else:
-                # Salvamos a data como string para o banco de dados
                 dados = {"licenca": serie, "data_vencimento": str(vencimento)}
                 
                 if modo_edicao:
-                    # Atualização no Supabase/Banco usando o ID existente
                     res = services.get_client().table("Licencas_Validades").update(dados).eq("id", lic_data['id']).execute()
                     if res: st.success("Licença atualizada!")
                 else:
-                    # Cadastro de nova licença
                     if services.add_registro("Licencas_Validades", dados):
                         st.success("Licença cadastrada!")
 
