@@ -87,6 +87,6 @@ def render(go, tipo):
             trator_dono = item.get("vinculo")
             
             if trator_dono:
-               st.error(f" Frota: **{trator_dono}**")
+               st.error(f"📍Frota: **{trator_dono}**")
             else:
                 st.success("✅ Disponível em Estoque")
