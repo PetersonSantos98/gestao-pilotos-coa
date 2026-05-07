@@ -4,9 +4,7 @@ from services import get_itens_com_status, add_registro
 def render(go, tipo):
     if st.button("⬅️ Voltar"): go("home")
     
-    # Mapeamento para garantir que usamos os nomes das tabelas do banco
     tabelas = {"antenas": "Antenas", "monitores": "Monitores", "navs": "Navs"}
-    # Identifica qual a coluna de série correta para cada tabela
     colunas_serie = {"antenas": "antena_serie", "monitores": "monitor_serie", "navs": "nav_serie"}
     
     nome_tabela = tabelas.get(tipo)
@@ -62,7 +60,6 @@ def render(go, tipo):
     st.write("---")
     busca = st.text_input(f"🔍 Filtrar {nome_tabela}...")
     
-    # AQUI ESTÁ A MÁGICA: busca os dados já cruzados com a frota
     dados = get_itens_com_status(nome_tabela, coluna_id)
     
     if busca:
@@ -90,6 +87,6 @@ def render(go, tipo):
             trator_dono = item.get("vinculo")
             
             if trator_dono:
-                st.error(f"🚜 Ocupado em Frota: **{trator_dono}**")
+                st.error(f"🚜 Frota: **{trator_dono}**")
             else:
                 st.success("✅ Disponível em Estoque")
