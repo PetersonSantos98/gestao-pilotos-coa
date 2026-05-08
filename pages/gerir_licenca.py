@@ -34,7 +34,7 @@ def render(go):
         vencimento = st.date_input("Data de Vencimento", value=data_sugerida, format="DD/MM/YYYY")
 
         # O botão de submit DEVE estar dentro do bloco 'with st.form'
-        submetido = st.form_submit_button("Salvar Alterações")
+        submetido = st.form_submit_button("💾 Salvar Alterações")
 
         if submetido:
             if not serie:
