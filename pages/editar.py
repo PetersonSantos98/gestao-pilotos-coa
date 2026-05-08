@@ -2,7 +2,7 @@ import streamlit as st
 import services
 
 def render(go):
-    # Recuperamos as variáveis de controle do session_state
+    # Recuperamos as variáveis de controlo do session_state
     item = st.session_state.get("item_para_editar")
     tipo = st.session_state.get("tipo_edicao")
     id_edit = st.session_state.get("edit_id")
@@ -37,21 +37,21 @@ def render(go):
         with st.form("form_edit_frota"):
             nome = st.text_input("Nome do Equipamento", value=item_frota["nome"])
             
-            # --- SELEÇÃO DE ANTENA ---
+            # --- SELECÇÃO DE ANTENA ---
             lista_antenas = [VAZIO] + antenas_opt
             idx_antena = next((i for i, x in enumerate(lista_antenas) if x["antena_serie"] == item_frota["antena"]), 0)
             antena = st.selectbox("Antena", options=lista_antenas, 
                                  format_func=lambda x: f"{x['antena_serie']} ({x['modelo_antena']})" if x["antena_serie"] else "❌ Remover", 
                                  index=idx_antena)
 
-            # --- SELEÇÃO DE MONITOR ---
+            # --- SELECÇÃO DE MONITOR ---
             lista_monitores = [VAZIO] + monitores_opt
             idx_monitor = next((i for i, x in enumerate(lista_monitores) if x["monitor_serie"] == item_frota["monitor"]), 0)
             monitor = st.selectbox("Monitor", options=lista_monitores, 
                                   format_func=lambda x: f"{x['monitor_serie']} ({x['modelo_monitor']})" if x["monitor_serie"] else "❌ Remover", 
                                   index=idx_monitor)
 
-            # --- SELEÇÃO DE NAV (READICIONADO) ---
+            # --- SELECÇÃO DE NAV (READICIONADO) ---
             lista_navs = [VAZIO] + navs_opt
             idx_nav = next((i for i, x in enumerate(lista_navs) if x["nav_serie"] == item_frota["nav"]), 0)
             nav = st.selectbox("NAV", options=lista_navs, 
@@ -63,13 +63,13 @@ def render(go):
                     "nome": nome,
                     "antena": antena["antena_serie"],
                     "monitor": monitor["monitor_serie"],
-                    "nav": nav["nav_serie"]
+                    "nav": nav["nav_serie"]  # Agora o NAV é enviado corretamente
                 }
                 if services.update_equipamento(id_edit, payload):
                     st.success("Frota e vínculos atualizados com sucesso!")
                     st.rerun()
 
-    # --- CENÁRIO B: EDIÇÃO DE COMPONENTES (DADOS TÉCNICOS DA PEÇA) ---
+    # --- CENÁRIO B: EDIÇÃO DE COMPONENTES (DADOS TÉCNICOS) ---
     else:
         if not item:
             st.error("Item para editar não encontrado.")
@@ -85,8 +85,7 @@ def render(go):
                 tabela = "Antenas"
                 serie = st.text_input("Série", value=item.get("antena_serie"))
                 mod = st.text_input("Modelo", value=item.get("modelo_antena"))
-                marca = st.text_input("Marca", value=item.get("marca_sinal"))
-                novos_dados = {"antena_serie": serie, "modelo_antena": mod, "marca_sinal": marca}
+                novos_dados = {"antena_serie": serie, "modelo_antena": mod}
             
             elif tipo == "monitores":
                 tabela = "Monitores"
@@ -99,8 +98,7 @@ def render(go):
                 serie = st.text_input("Série", value=item.get("nav_serie"))
                 novos_dados = {"nav_serie": serie}
 
-            if st.form_submit_button("💾 Salvar Dados do Componente"):
-                # item['id'] é o ID único do registro no Supabase
+            if st.form_submit_button("💾 Salvar Alterações"):
                 if services.update_registro_generico(tabela, item['id'], novos_dados):
-                    st.success(f"{tipo.title()} atualizado com sucesso!")
+                    st.success("Dados atualizados!")
                     st.rerun()
