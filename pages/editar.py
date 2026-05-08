@@ -2,65 +2,90 @@ import streamlit as st
 import services
 
 def render(go):
-    # Recupera o item e o tipo definidos no botão 'Editar' das outras páginas
+    # Recuperamos as variáveis de controlo do session_state
     item = st.session_state.get("item_para_editar")
     tipo = st.session_state.get("tipo_edicao")
+    id_edit = st.session_state.get("edit_id") # Usado especificamente para Frotas
 
-    if not item or not tipo:
-        st.error("Nenhum item selecionado para edição.")
-        if st.button("⬅️ Voltar"): go("home")
+    # Botão de voltar dinâmico
+    if st.button("⬅️ Cancelar"): 
+        go("frotas" if tipo == "frotas" else "home")
+
+    if not tipo:
+        st.error("Erro: Tipo de edição não definido.")
         return
 
-    # Título dinâmico
-    st.subheader(f"📝 Editando {tipo.title()}: {item.get('antena_serie') or item.get('monitor_serie') or item.get('nav_serie') or item.get('codigo_do_equipamento') or ''}")
+    # --- CENÁRIO A: EDIÇÃO DE FROTAS (VÍNCULOS) ---
+    if tipo == "frotas":
+        data = services.get_equipamentos()
+        item_frota = next((x for x in data if x["id"] == id_edit), None)
 
-    with st.form("form_edicao_geral"):
-        novos_dados = {}
-        nome_tabela = ""
+        if not item_frota:
+            st.error("Equipamento de frota não localizado.")
+            return
 
-        # --- FORMULÁRIO PARA ANTENAS ---
-        if tipo == "antenas":
-            nome_tabela = "Antenas"
-            col_id = "antena_serie" # Usamos a série como referência se não houver ID numérico
-            serie = st.text_input("Série da Antena", value=item.get("antena_serie", ""))
-            modelo = st.text_input("Modelo", value=item.get("modelo_antena", ""))
-            marca = st.text_input("Marca", value=item.get("marca_sinal", ""))
-            novos_dados = {"antena_serie": serie, "modelo_antena": modelo, "marca_sinal": marca}
+        st.subheader(f"Editando Frota: {item_frota['codigo_do_equipamento']}")
 
-        # --- FORMULÁRIO PARA MONITORES ---
-        elif tipo == "monitores":
-            nome_tabela = "Monitores"
-            col_id = "monitor_serie"
-            serie = st.text_input("Série do Monitor", value=item.get("monitor_serie", ""))
-            modelo = st.text_input("Modelo", value=item.get("modelo_monitor", ""))
-            novos_dados = {"monitor_serie": serie, "modelo_monitor": modelo}
+        # Opções disponíveis (Lógica que já tinhas)
+        antenas_opt = services.get_itens_disponiveis("Antenas", "antena_serie", item_frota["antena"])
+        monitores_opt = services.get_itens_disponiveis("Monitores", "monitor_serie", item_frota["monitor"])
+        navs_opt = services.get_itens_disponiveis("Navs", "nav_serie", item_frota["nav"])
 
-        # --- FORMULÁRIO PARA NAVS ---
-        elif tipo == "navs":
-            nome_tabela = "Navs"
-            col_id = "nav_serie"
-            serie = st.text_input("Série do Nav", value=item.get("nav_serie", ""))
-            novos_dados = {"nav_serie": serie}
+        VAZIO = {"antena_serie": None, "modelo_antena": None, "monitor_serie": None, "modelo_monitor": None, "nav_serie": None}
 
-        # --- FORMULÁRIO PARA LICENÇAS ---
-        elif tipo == "licencas":
-            nome_tabela = "Licencas_Validades"
-            col_id = "id"
-            serie = st.text_input("Série do Equipamento", value=item.get("serie_equipamento", ""))
-            data = st.text_input("Data de Vencimento", value=item.get("data_vencimento", ""))
-            obs = st.text_area("Observações", value=item.get("observacoes", ""))
-            novos_dados = {"serie_equipamento": serie, "data_vencimento": data, "observacoes": obs}
-
-        # Botões de ação
-        col_salvar, col_cancelar = st.columns(2)
-        
-        if col_salvar.form_submit_button("💾 Salvar Alterações"):
-            # Usamos uma função genérica de update no services
-            id_valor = item.get("id") # Tenta pegar o ID único do banco
+        with st.form("form_edit_frota"):
+            nome = st.text_input("Nome do Equipamento", value=item_frota["nome"])
             
-            if services.update_registro_generico(nome_tabela, id_valor, novos_dados):
-                st.success("✅ Atualizado com sucesso!")
-                st.rerun()
+            # Selectbox Antena
+            lista_antenas = [VAZIO] + antenas_opt
+            idx_antena = next((i for i, x in enumerate(lista_antenas) if x["antena_serie"] == item_frota["antena"]), 0)
+            antena = st.selectbox("Antena", options=lista_antenas, 
+                                 format_func=lambda x: f"{x['antena_serie']} ({x['modelo_antena']})" if x["antena_serie"] else "❌ Remover", 
+                                 index=idx_antena)
 
-        if col_cancelar.form_submit_button("❌ Cancelar"):
-            go("home")
+            # Selectbox Monitor
+            lista_monitores = [VAZIO] + monitores_opt
+            idx_monitor = next((i for i, x in enumerate(lista_monitores) if x["monitor_serie"] == item_frota["monitor"]), 0)
+            monitor = st.selectbox("Monitor", options=lista_monitores, 
+                                  format_func=lambda x: f"{x['monitor_serie']} ({x['modelo_monitor']})" if x["monitor_serie"] else "❌ Remover", 
+                                  index=idx_monitor)
+
+            if st.form_submit_button("💾 Salvar Vínculos da Frota"):
+                payload = {
+                    "nome": nome,
+                    "antena": antena["antena_serie"],
+                    "monitor": monitor["monitor_serie"]
+                }
+                if services.update_equipamento(id_edit, payload):
+                    st.success("Frota atualizada!")
+                    st.rerun()
+
+    # --- CENÁRIO B: EDIÇÃO DE COMPONENTES (ANTENA/MONITOR/NAV) ---
+    else:
+        if not item:
+            st.error("Item para editar não encontrado.")
+            return
+
+        # Título dinâmico para o componente
+        st.subheader(f"Editando {tipo.title()}: {item.get('antena_serie') or item.get('monitor_serie') or item.get('nav_serie')}")
+
+        with st.form("form_edit_componente"):
+            novos_dados = {}
+            tabela = ""
+            
+            if tipo == "antenas":
+                tabela = "Antenas"
+                serie = st.text_input("Série", value=item.get("antena_serie"))
+                mod = st.text_input("Modelo", value=item.get("modelo_antena"))
+                novos_dados = {"antena_serie": serie, "modelo_antena": mod}
+            
+            elif tipo == "monitores":
+                tabela = "Monitores"
+                serie = st.text_input("Série", value=item.get("monitor_serie"))
+                mod = st.text_input("Modelo", value=item.get("modelo_monitor"))
+                novos_dados = {"monitor_serie": serie, "modelo_monitor": mod}
+
+            if st.form_submit_button("💾 Salvar Dados do Componente"):
+                if services.update_registro_generico(tabela, item['id'], novos_dados):
+                    st.success("Componente atualizado!")
+                    st.rerun()
