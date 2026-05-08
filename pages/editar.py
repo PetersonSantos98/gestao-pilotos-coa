@@ -8,7 +8,7 @@ def render(go):
     id_edit = st.session_state.get("edit_id")
 
     # Botão Voltar
-    if st.button("⬅️ Cancelar"): 
+    if st.button("⬅️ Voltar"): 
         go("frotas" if tipo == "frotas" else "home")
 
     if not tipo:
@@ -54,7 +54,7 @@ def render(go):
             nav = st.selectbox("NAV", options=l_navs, index=idx_nav,
                               format_func=lambda x: f"{x['nav_serie']}" if x["nav_serie"] else "❌ Remover")
 
-            if st.form_submit_button("💾 Salvar Vínculos da Frota"):
+            if st.form_submit_button("💾 Salvar Alterações"):
                 payload = {
                     "nome": nome,
                     "antena": antena["antena_serie"],
@@ -95,7 +95,7 @@ def render(go):
                 serie = st.text_input("Série", value=item.get("nav_serie"))
                 novos_dados = {"nav_serie": serie}
 
-            if st.form_submit_button("💾 Salvar Alterações no Cadastro"):
+            if st.form_submit_button("💾 Salvar Alterações"):
                 if services.update_registro_generico(tabela, item['id'], novos_dados):
                     st.success("Cadastro atualizado!")
                     st.rerun()
