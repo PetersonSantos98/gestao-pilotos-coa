@@ -7,12 +7,12 @@ def render(go):
     tipo = st.session_state.get("tipo_edicao")
     id_edit = st.session_state.get("edit_id")
 
-    # Botão Voltar
+    # Botão Voltar/Cancelar
     if st.button("⬅️ Voltar"): 
         go("frotas" if tipo == "frotas" else "home")
 
     if not tipo:
-        st.error("Erro: Tipo de edição não identificado.")
+        st.error("Erro: Tipo de edição não definido.")
         return
 
     # --- BLOCO 1: EDIÇÃO DE FROTAS (VÍNCULOS) ---
@@ -26,7 +26,7 @@ def render(go):
 
         st.subheader(f"Edição de Vínculos - Frota: {item_frota['codigo_do_equipamento']}")
 
-        # Busca opções disponíveis respeitando quem já está no trator
+        # Busca opções disponíveis
         antenas_opt = services.get_itens_disponiveis("Antenas", "antena_serie", item_frota["antena"])
         monitores_opt = services.get_itens_disponiveis("Monitores", "monitor_serie", item_frota["monitor"])
         navs_opt = services.get_itens_disponiveis("Navs", "nav_serie", item_frota["nav"])
@@ -48,7 +48,7 @@ def render(go):
             monitor = st.selectbox("Monitor", options=l_monitores, index=idx_mon,
                                   format_func=lambda x: f"{x['monitor_serie']} ({x['modelo_monitor']})" if x["monitor_serie"] else "❌ Remover")
 
-            # NAV (Mantido e Integrado)
+            # NAV
             l_navs = [VAZIO] + navs_opt
             idx_nav = next((i for i, x in enumerate(l_navs) if x["nav_serie"] == item_frota["nav"]), 0)
             nav = st.selectbox("NAV", options=l_navs, index=idx_nav,
@@ -63,9 +63,9 @@ def render(go):
                 }
                 if services.update_equipamento(id_edit, payload):
                     st.success("Frota atualizada!")
-                    st.rerun()
+                    go("frotas")  # FECHA A PÁGINA E VOLTA PARA LISTA DE FROTAS
 
-    # --- BLOCO 2: EDIÇÃO DE COMPONENTES (DADOS TÉCNICOS) ---
+    # --- BLOCO 2: EDIÇÃO DE COMPONENTES (CADASTRO) ---
     else:
         if not item:
             st.error("Dados do componente não carregados.")
@@ -98,4 +98,4 @@ def render(go):
             if st.form_submit_button("💾 Salvar Alterações"):
                 if services.update_registro_generico(tabela, item['id'], novos_dados):
                     st.success("Cadastro atualizado!")
-                    st.rerun()
+                    go("home")  # FECHA A PÁGINA E VOLTA PARA O MENU PRINCIPAL (OU GESTÃO)
