@@ -134,6 +134,21 @@ def update_equipamento(equip_id, dados):
         st.error(f"Erro ao atualizar: {e}")
         return False
 
+def update_registro_generico(tabela, item_id, dados):
+    """
+    ATUALIZAÇÃO DINÂMICA: Permite editar Antenas, Monitores, Navs ou Licenças.
+    Busca o registro pelo ID único.
+    """
+    try:
+        supabase = get_client()
+        # Filtra apenas o que é ID para a cláusula WHERE e o resto para o UPDATE
+        supabase.table(tabela).update(dados).eq("id", item_id).execute()
+        st.cache_data.clear() # Força o app a ler os dados novos do banco
+        return True
+    except Exception as e:
+        st.error(f"Erro ao atualizar {tabela}: {e}")
+        return False
+
 def verificar_login(usuario, senha):
     """Validação de acesso simples."""
     try:
