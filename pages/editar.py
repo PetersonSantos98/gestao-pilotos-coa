@@ -2,71 +2,65 @@ import streamlit as st
 import services
 
 def render(go):
-    if st.button("⬅️ Cancelar"): go("frotas")
+    # Recupera o item e o tipo definidos no botão 'Editar' das outras páginas
+    item = st.session_state.get("item_para_editar")
+    tipo = st.session_state.get("tipo_edicao")
 
-    id_edit = st.session_state.get("edit_id")
-    data = services.get_equipamentos()
-    item = next((x for x in data if x["id"] == id_edit), None)
-
-    if not item:
-        st.error("Equipamento não localizado.")
+    if not item or not tipo:
+        st.error("Nenhum item selecionado para edição.")
+        if st.button("⬅️ Voltar"): go("home")
         return
 
-    st.subheader(f"Editando {item['codigo_do_equipamento']}")
+    # Título dinâmico
+    st.subheader(f"📝 Editando {tipo.title()}: {item.get('antena_serie') or item.get('monitor_serie') or item.get('nav_serie') or item.get('codigo_do_equipamento') or ''}")
 
-    # 1. Buscamos as opções disponíveis
-    antenas_opt = services.get_itens_disponiveis("Antenas", "antena_serie", item["antena"])
-    monitores_opt = services.get_itens_disponiveis("Monitores", "monitor_serie", item["monitor"])
-    navs_opt = services.get_itens_disponiveis("Navs", "nav_serie", item["nav"])
+    with st.form("form_edicao_geral"):
+        novos_dados = {}
+        nome_tabela = ""
 
-    # 2. Criamos um item padrão "Vazio" simplificado
-    VAZIO = {"antena_serie": None, "modelo_antena": None, "marca_sinal": None, 
-             "monitor_serie": None, "modelo_monitor": None, "nav_serie": None}
+        # --- FORMULÁRIO PARA ANTENAS ---
+        if tipo == "antenas":
+            nome_tabela = "Antenas"
+            col_id = "antena_serie" # Usamos a série como referência se não houver ID numérico
+            serie = st.text_input("Série da Antena", value=item.get("antena_serie", ""))
+            modelo = st.text_input("Modelo", value=item.get("modelo_antena", ""))
+            marca = st.text_input("Marca", value=item.get("marca_sinal", ""))
+            novos_dados = {"antena_serie": serie, "modelo_antena": modelo, "marca_sinal": marca}
 
-    with st.form("form_edit"):
-        nome = st.text_input("Nome", value=item["nome"])
+        # --- FORMULÁRIO PARA MONITORES ---
+        elif tipo == "monitores":
+            nome_tabela = "Monitores"
+            col_id = "monitor_serie"
+            serie = st.text_input("Série do Monitor", value=item.get("monitor_serie", ""))
+            modelo = st.text_input("Modelo", value=item.get("modelo_monitor", ""))
+            novos_dados = {"monitor_serie": serie, "modelo_monitor": modelo}
+
+        # --- FORMULÁRIO PARA NAVS ---
+        elif tipo == "navs":
+            nome_tabela = "Navs"
+            col_id = "nav_serie"
+            serie = st.text_input("Série do Nav", value=item.get("nav_serie", ""))
+            novos_dados = {"nav_serie": serie}
+
+        # --- FORMULÁRIO PARA LICENÇAS ---
+        elif tipo == "licencas":
+            nome_tabela = "Licencas_Validades"
+            col_id = "id"
+            serie = st.text_input("Série do Equipamento", value=item.get("serie_equipamento", ""))
+            data = st.text_input("Data de Vencimento", value=item.get("data_vencimento", ""))
+            obs = st.text_area("Observações", value=item.get("observacoes", ""))
+            novos_dados = {"serie_equipamento": serie, "data_vencimento": data, "observacoes": obs}
+
+        # Botões de ação
+        col_salvar, col_cancelar = st.columns(2)
         
-        # --- SELEÇÃO DE ANTENA ---
-        lista_antenas = [VAZIO] + antenas_opt
-        idx_antena = next((i for i, x in enumerate(lista_antenas) if x["antena_serie"] == item["antena"]), 0)
-        
-        antena = st.selectbox(
-            "Antena", 
-            options=lista_antenas,
-            format_func=lambda x: f"{x['antena_serie']} ({x['modelo_antena']})" if x["antena_serie"] else "❌ Nenhum / Remover",
-            index=idx_antena
-        )
-
-        # --- SELEÇÃO DE MONITOR ---
-        lista_monitores = [VAZIO] + monitores_opt
-        idx_monitor = next((i for i, x in enumerate(lista_monitores) if x["monitor_serie"] == item["monitor"]), 0)
-        
-        monitor = st.selectbox(
-            "Monitor", 
-            options=lista_monitores,
-            format_func=lambda x: f"{x['monitor_serie']} ({x['modelo_monitor']})" if x["monitor_serie"] else "❌ Nenhum / Remover",
-            index=idx_monitor
-        )
-
-        # --- SELEÇÃO DE NAV ---
-        lista_navs = [VAZIO] + navs_opt
-        idx_nav = next((i for i, x in enumerate(lista_navs) if x["nav_serie"] == item["nav"]), 0)
-        
-        nav = st.selectbox(
-            "NAV", 
-            options=lista_navs,
-            format_func=lambda x: f"{x['nav_serie']}" if x["nav_serie"] else "❌ Nenhum / Remover",
-            index=idx_nav
-        )
-
-        if st.form_submit_button("💾 Salvar Alterações"):
-            payload = {
-                "nome": nome,
-                "antena": antena["antena_serie"],
-                "monitor": monitor["monitor_serie"],
-                "nav": nav["nav_serie"]
-            }
+        if col_salvar.form_submit_button("💾 Salvar Alterações"):
+            # Usamos uma função genérica de update no services
+            id_valor = item.get("id") # Tenta pegar o ID único do banco
             
-            if services.update_equipamento(id_edit, payload):
-                st.success("Equipamento atualizado com sucesso!")
-                st.rerun() # Use rerun para atualizar a tela e limpar o cache visual
+            if services.update_registro_generico(nome_tabela, id_valor, novos_dados):
+                st.success("✅ Atualizado com sucesso!")
+                st.rerun()
+
+        if col_cancelar.form_submit_button("❌ Cancelar"):
+            go("home")
