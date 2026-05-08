@@ -27,7 +27,7 @@ def render(go):
         nav = st.selectbox("Selecionar NAV Disponível", 
                            options=[None] + [n['nav_serie'] for n in navs])
 
-        if st.form_submit_button("Salvar Frota"):
+        if st.form_submit_button("💾 Salvar Frota"):
             if not codigo:
                 st.error("O código do equipamento é obrigatório.")
             else:
