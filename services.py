@@ -17,7 +17,7 @@ def get_client():
 
 @st.cache_data(ttl=10)
 def get_equipamentos():
-    """Busca a frota e anexa os modelos das peças via Python para evitar erros de relacionamento."""
+    """Busca a frota e anexa os modelos das peças."""
     try:
         supabase = get_client()
 
@@ -56,7 +56,7 @@ def get_equipamentos():
 def get_itens_com_status(tabela, coluna_serie):
     """
     RASTREAMENTO TIPO VENCIMENTO:
-    Identifica se a peça está em uso e por QUAL trator.
+    Identifica se a peça está em uso e por qual trator.
     """
     try:
         supabase = get_client()
