@@ -20,7 +20,6 @@ def render(go):
         if modo_edicao and lic_data.get('data_vencimento'):
             try:
                 # Tenta converter a string do banco para objeto date
-                # Ajustado para garantir que o Streamlit receba o tipo correto
                 if isinstance(lic_data['data_vencimento'], str):
                     data_sugerida = datetime.datetime.strptime(lic_data['data_vencimento'], '%Y-%m-%d').date()
                 else:
@@ -43,8 +42,9 @@ def render(go):
                 dados = {"licenca": serie, "data_vencimento": str(vencimento)}
                 
                 if modo_edicao:
-                    res = services.get_client().table("Licencas_Validades").update(dados).eq("id", lic_data['id']).execute()
-                    if res: st.success("Licença atualizada!")
+                    # CORRIGIDO: Agora utiliza a função compatível com SQLAlchemy / PostgreSQL do Render
+                    if services.update_registro_generico("Licencas_Validades", lic_data['id'], dados):
+                        st.success("Licença atualizada!")
                 else:
                     if services.add_registro("Licencas_Validades", dados):
                         st.success("Licença cadastrada!")
