@@ -19,7 +19,6 @@ def render(go):
         # Lógica para definir a data inicial do seletor
         if modo_edicao and lic_data.get('data_vencimento'):
             try:
-                # Tenta converter a string do banco para objeto date
                 if isinstance(lic_data['data_vencimento'], str):
                     data_sugerida = datetime.datetime.strptime(lic_data['data_vencimento'], '%Y-%m-%d').date()
                 else:
@@ -42,14 +41,25 @@ def render(go):
                 dados = {"licenca": serie, "data_vencimento": str(vencimento)}
                 
                 if modo_edicao:
-                    # CORRIGIDO: Agora utiliza a função compatível com SQLAlchemy / PostgreSQL do Render
                     if services.update_registro_generico("Licencas_Validades", lic_data['id'], dados):
                         st.success("Licença atualizada!")
                 else:
                     if services.add_registro("Licencas_Validades", dados):
                         st.success("Licença cadastrada!")
 
-                # Limpeza de estado e retorno
                 st.session_state.licenca_edit = None
                 st.cache_data.clear()
                 go("vencimentos")
+
+    # --- BOTÃO DE EXCLUIR (Apenas visível se estiver editando um item existente) ---
+    if modo_edicao:
+        st.write("---")
+        # Criamos um expander ou caixinha de aviso para evitar exclusão acidental
+        with st.expander("⚠️ Zona de Perigo - Excluir Registro"):
+            st.warning("Tem certeza de que deseja deletar esta licença? Essa ação não pode ser desfeita.")
+            if st.button("🗑️ Confirmar Exclusão Definitiva", type="primary", use_container_width=True):
+                if services.delete_registro("Licencas_Validades", lic_data['id']):
+                    st.success("Licença excluída com sucesso!")
+                    st.session_state.licenca_edit = None
+                    st.cache_data.clear()
+                    go("vencimentos")
