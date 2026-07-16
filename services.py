@@ -1,52 +1,61 @@
 import streamlit as st
-from supabase import create_client
+from sqlalchemy import create_engine, text
+import pandas as pd
 
-def get_config():
-    return (
-        st.secrets["SUPABASE_URL"],
-        st.secrets["SUPABASE_KEY"]
-    )
+# --- CONEXÃO COM O POSTGRESQL (RENDER) ---
 
 @st.cache_resource
-def get_client():
-    """Cria o cliente de conexão com o Supabase."""
-    url, key = get_config()
-    return create_client(url, key)
+def get_engine():
+    """Cria e faz cache do engine de conexão com o PostgreSQL do Render."""
+    try:
+        pg = st.secrets["postgres"]
+        db_url = f"postgresql://{pg['username']}:{pg['password']}@{pg['host']}:{pg['port']}/{pg['database']}"
+        return create_engine(db_url)
+    except Exception as e:
+        st.error(f"Erro ao carregar credenciais do banco: {e}")
+        return None
 
-# --- BUSCAS DE DADOS (COM RASTREAMENTO DE VÍNCULOS) ---
+def executar_query(query, params=None, retornar_dados=True):
+    """Auxiliar para executar comandos SQL de forma segura."""
+    engine = get_engine()
+    if not engine:
+        return [] if retornar_dados else False
+    
+    try:
+        with engine.begin() as conn:
+            resultado = conn.execute(text(query), params or {})
+            if retornar_dados:
+                # Converte os resultados em uma lista de dicionários
+                return [dict(row._mapping) for row in resultado]
+            return True
+    except Exception as e:
+        st.error(f"Erro na execução da query: {e}")
+        return [] if retornar_dados else False
+
+# --- BUSCAS DE DADOS ---
 
 @st.cache_data(ttl=10)
 def get_equipamentos():
     """Busca a frota e anexa os modelos das peças."""
     try:
-        supabase = get_client()
+        # Busca equipamentos
+        query_eq = "SELECT id, codigo_do_equipamento, nome, antena, monitor, nav FROM equipamentos ORDER BY codigo_do_equipamento"
+        equipamentos = executar_query(query_eq)
 
-        res = (
-            supabase.table("Equipamentos")
-            .select("id, codigo_do_equipamento, nome, antena, monitor, nav")
-            .order("codigo_do_equipamento")
-            .execute()
-        )
+        # Busca antenas e monitores para fazer o de-para
+        antenas_list = executar_query("SELECT * FROM antenas")
+        monitores_list = executar_query("SELECT * FROM monitores")
 
-        antenas = {
-            a["antena_serie"]: a
-            for a in supabase.table("Antenas").select("*").execute().data
-        }
-
-        monitores = {
-            m["monitor_serie"]: m
-            for m in supabase.table("Monitores").select("*").execute().data
-        }
+        antenas = {a["antena_serie"]: a for a in antenas_list if "antena_serie" in a}
+        monitores = {m["monitor_serie"]: m for m in monitores_list if "monitor_serie" in m}
 
         dados_completos = []
-
-        for eq in res.data:
+        for eq in equipamentos:
             eq["Antenas"] = antenas.get(eq["antena"], {})
             eq["Monitores"] = monitores.get(eq["monitor"], {})
             dados_completos.append(eq)
 
         return dados_completos
-
     except Exception as e:
         st.error(f"Erro ao buscar frota: {e}")
         return []
@@ -59,34 +68,18 @@ def get_itens_com_status(tabela, coluna_serie):
     Identifica se a peça está em uso e por qual trator.
     """
     try:
-        supabase = get_client()
-
-        pecas = (
-            supabase.table(tabela)
-            .select("*")
-            .execute()
-            .data
-            or []
-        )
-
-        frota = (
-            supabase.table("Equipamentos")
-            .select("codigo_do_equipamento, antena, monitor, nav")
-            .execute()
-            .data
-        )
+        # Garante nome de tabela em minúsculo para o Postgres
+        tabela_min = tabela.lower()
+        pecas = executar_query(f"SELECT * FROM {tabela_min}")
+        frota = executar_query("SELECT codigo_do_equipamento, antena, monitor, nav FROM equipamentos")
 
         mapa_vinculos = {}
-
         for trator in frota:
             cod = trator["codigo_do_equipamento"]
-
             if trator.get("antena"):
                 mapa_vinculos[str(trator["antena"])] = cod
-
             if trator.get("monitor"):
                 mapa_vinculos[str(trator["monitor"])] = cod
-
             if trator.get("nav"):
                 mapa_vinculos[str(trator["nav"])] = cod
 
@@ -96,7 +89,6 @@ def get_itens_com_status(tabela, coluna_serie):
             p["disponivel"] = p["vinculo"] is None
 
         return pecas
-
     except Exception as e:
         st.error(f"Erro ao processar status e vínculos: {e}")
         return []
@@ -105,33 +97,16 @@ def get_itens_com_status(tabela, coluna_serie):
 @st.cache_data(ttl=10)
 def get_licencas_simples():
     """Busca as licenças para a página de vencimentos."""
-    try:
-        supabase = get_client()
-
-        res = (
-            supabase.table("Licencas_Validades")
-            .select("*")
-            .order("data_vencimento")
-            .execute()
-        )
-
-        return res.data or []
-
-    except Exception as e:
-        st.error(f"Erro ao buscar licenças: {e}")
-        return []
+    query = "SELECT * FROM licencas_validades ORDER BY data_vencimento"
+    return executar_query(query)
 
 
 @st.cache_data(ttl=10)
 def get_tabela_simples(tabela):
     """Busca dados brutos de qualquer tabela auxiliar."""
-    try:
-        supabase = get_client()
-        return supabase.table(tabela).select("*").execute().data or []
-
-    except Exception as e:
-        st.error(f"Erro na tabela {tabela}: {e}")
-        return []
+    tabela_min = tabela.lower()
+    query = f"SELECT * FROM {tabela_min}"
+    return executar_query(query)
 
 
 # --- OPERAÇÕES DE BANCO (CRUD) ---
@@ -140,27 +115,28 @@ def get_itens_disponiveis(tabela, coluna_serie, valor_atual=None):
     """Filtra itens para o SELECT de edição."""
     try:
         todos = get_itens_com_status(tabela, coluna_serie)
-
         return [
             i for i in todos
             if i["disponivel"] or str(i[coluna_serie]) == str(valor_atual)
         ]
-
     except Exception:
         return []
 
 
 def add_registro(tabela, dados):
-    """Insere novos registros no banco."""
+    """Insere novos registros no banco dinamicamente."""
     try:
-        supabase = get_client()
-
-        supabase.table(tabela).insert(dados).execute()
-
-        st.cache_data.clear()
-
-        return True
-
+        tabela_min = tabela.lower()
+        colunas = ", ".join(dados.keys())
+        valores_placeholder = ", ".join([f":{k}" for k in dados.keys()])
+        
+        query = f"INSERT INTO {tabela_min} ({colunas}) VALUES ({valores_placeholder})"
+        
+        sucesso = executar_query(query, dados, retornar_dados=False)
+        if sucesso:
+            st.cache_data.clear()
+            return True
+        return False
     except Exception as e:
         st.error(f"Erro ao inserir: {e}")
         return False
@@ -169,27 +145,18 @@ def add_registro(tabela, dados):
 def update_equipamento(equip_id, dados):
     """Atualiza equipamento."""
     try:
-        supabase = get_client()
-
         colunas_validas = ["nome", "antena", "monitor", "nav"]
+        payload = {k: v for k, v in dados.items() if k in colunas_validas}
+        payload["id"] = equip_id
 
-        payload = {
-            k: v
-            for k, v in dados.items()
-            if k in colunas_validas
-        }
+        set_clause = ", ".join([f"{k} = :{k}" for k in payload.keys() if k != "id"])
+        query = f"UPDATE equipamentos SET {set_clause} WHERE id = :id"
 
-        (
-            supabase.table("Equipamentos")
-            .update(payload)
-            .eq("id", equip_id)
-            .execute()
-        )
-
-        st.cache_data.clear()
-
-        return True
-
+        sucesso = executar_query(query, payload, retornar_dados=False)
+        if sucesso:
+            st.cache_data.clear()
+            return True
+        return False
     except Exception as e:
         st.error(f"Erro ao atualizar: {e}")
         return False
@@ -200,38 +167,28 @@ def update_registro_generico(tabela, item_id, dados):
     Atualiza Antenas, Monitores, Navs ou Licenças.
     """
     try:
-        supabase = get_client()
+        tabela_min = tabela.lower()
+        payload = dict(dados)
+        payload["id"] = item_id
 
-        (
-            supabase.table(tabela)
-            .update(dados)
-            .eq("id", item_id)
-            .execute()
-        )
+        set_clause = ", ".join([f"{k} = :{k}" for k in dados.keys()])
+        query = f"UPDATE {tabela_min} SET {set_clause} WHERE id = :id"
 
-        st.cache_data.clear()
-
-        return True
-
+        sucesso = executar_query(query, payload, retornar_dados=False)
+        if sucesso:
+            st.cache_data.clear()
+            return True
+        return False
     except Exception as e:
-        st.error(f"Erro ao atualizar {tabela}: {e}")
+        st.error(f"Erro ao atualizar {tabela_min}: {e}")
         return False
 
 
 def verificar_login(usuario, senha):
-    """Validação de acesso simples."""
+    """Validação de acesso simples contra a tabela 'usuarios'."""
     try:
-        supabase = get_client()
-
-        res = (
-            supabase.table("usuarios")
-            .select("*")
-            .eq("usuarios", usuario)
-            .eq("senha", senha)
-            .execute()
-        )
-
-        return len(res.data) > 0
-
+        query = "SELECT * FROM usuarios WHERE usuarios = :usuario AND senha = :senha"
+        res = executar_query(query, {"usuario": usuario, "senha": senha})
+        return len(res) > 0
     except Exception:
         return False
