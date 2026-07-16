@@ -1,7 +1,10 @@
 import streamlit as st
-from pages import home, frotas, editar, vencimentos, componentes, adicionar_frota, gerir_licenca
-import services  # Importação robusta
+import importlib
+import services
+importlib.reload(services)
 
+from pages import home, frotas, editar, vencimentos, componentes, adicionar_frota, gerir_licenca
+# ... restante do seu código
 # Configuração de Layout
 st.set_page_config(page_title="Gestão de Componentes", layout="centered")
 
