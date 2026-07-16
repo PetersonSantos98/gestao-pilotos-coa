@@ -2,12 +2,10 @@ import streamlit as st
 import services
 
 def render(go):
-    # Recuperamos os estados para saber o que editar
     item = st.session_state.get("item_para_editar")
     tipo = st.session_state.get("tipo_edicao")
     id_edit = st.session_state.get("edit_id")
 
-    # Botão Voltar/Cancelar
     if st.button("⬅️ Voltar"): 
         go("frotas" if tipo == "frotas" else "home")
 
@@ -26,7 +24,6 @@ def render(go):
 
         st.subheader(f"Edição de Vínculos - Frota: {item_frota['codigo_do_equipamento']}")
 
-        # Busca opções disponíveis
         antenas_opt = services.get_itens_disponiveis("Antenas", "antena_serie", item_frota["antena"])
         monitores_opt = services.get_itens_disponiveis("Monitores", "monitor_serie", item_frota["monitor"])
         navs_opt = services.get_itens_disponiveis("Navs", "nav_serie", item_frota["nav"])
@@ -40,19 +37,19 @@ def render(go):
             l_antenas = [VAZIO] + antenas_opt
             idx_ant = next((i for i, x in enumerate(l_antenas) if x["antena_serie"] == item_frota["antena"]), 0)
             antena = st.selectbox("Antena", options=l_antenas, index=idx_ant,
-                                 format_func=lambda x: f"{x['antena_serie']} ({x['modelo_antena']})" if x["antena_serie"] else "❌ Remover")
+                                  format_func=lambda x: f"{x['antena_serie']} ({x['modelo_antena']})" if x["antena_serie"] else "❌ Remover")
 
             # Monitor
             l_monitores = [VAZIO] + monitores_opt
             idx_mon = next((i for i, x in enumerate(l_monitores) if x["monitor_serie"] == item_frota["monitor"]), 0)
             monitor = st.selectbox("Monitor", options=l_monitores, index=idx_mon,
-                                  format_func=lambda x: f"{x['monitor_serie']} ({x['modelo_monitor']})" if x["monitor_serie"] else "❌ Remover")
+                                   format_func=lambda x: f"{x['monitor_serie']} ({x['modelo_monitor']})" if x["monitor_serie"] else "❌ Remover")
 
             # NAV
             l_navs = [VAZIO] + navs_opt
             idx_nav = next((i for i, x in enumerate(l_navs) if x["nav_serie"] == item_frota["nav"]), 0)
             nav = st.selectbox("NAV", options=l_navs, index=idx_nav,
-                              format_func=lambda x: f"{x['nav_serie']}" if x["nav_serie"] else "❌ Remover")
+                               format_func=lambda x: f"{x['nav_serie']}" if x["nav_serie"] else "❌ Remover")
 
             if st.form_submit_button("💾 Salvar Alterações"):
                 payload = {
@@ -63,7 +60,16 @@ def render(go):
                 }
                 if services.update_equipamento(id_edit, payload):
                     st.success("Frota atualizada!")
-                    go("frotas")  # FECHA A PÁGINA E VOLTA PARA LISTA DE FROTAS
+                    go("frotas")
+
+        # Excluir Frota
+        st.write("---")
+        with st.expander("⚠️ Zona de Perigo - Excluir Equipamento"):
+            st.warning("Deletar a frota liberará todos os componentes (Antena, Monitor e Nav) para uso em outros tratores.")
+            if st.button("🗑️ Confirmar Exclusão da Frota", type="primary", use_container_width=True):
+                if services.delete_registro("Equipamentos", id_edit):
+                    st.success("Frota excluída!")
+                    go("frotas")
 
     # --- BLOCO 2: EDIÇÃO DE COMPONENTES (CADASTRO) ---
     else:
@@ -98,4 +104,13 @@ def render(go):
             if st.form_submit_button("💾 Salvar Alterações"):
                 if services.update_registro_generico(tabela, item['id'], novos_dados):
                     st.success("Cadastro atualizado!")
-                    go("home")  # FECHA A PÁGINA E VOLTA PARA O MENU PRINCIPAL (OU GESTÃO)
+                    go("home")
+
+        # Excluir Componente
+        st.write("---")
+        with st.expander("⚠️ Zona de Perigo - Excluir Componente"):
+            st.warning("Verifique se o componente não está associado a nenhuma frota ativa antes de excluí-lo.")
+            if st.button(f"🗑️ Confirmar Exclusão de {tipo.title()}", type="primary", use_container_width=True):
+                if services.delete_registro(tabela, item['id']):
+                    st.success("Componente excluído!")
+                    go("home")
