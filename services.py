@@ -184,6 +184,24 @@ def update_registro_generico(tabela, item_id, dados):
         return False
 
 
+def delete_registro(tabela, item_id):
+    """
+    Remove permanentemente um registro de qualquer tabela pelo ID.
+    """
+    try:
+        tabela_min = tabela.lower()
+        query = f"DELETE FROM {tabela_min} WHERE id = :id"
+        
+        sucesso = executar_query(query, {"id": item_id}, retornar_dados=False)
+        if sucesso:
+            st.cache_data.clear()
+            return True
+        return False
+    except Exception as e:
+        st.error(f"Erro ao excluir registro de {tabela_min}: {e}")
+        return False
+
+
 def verificar_login(usuario, senha):
     """Validação de acesso simples contra a tabela 'usuarios'."""
     try:
