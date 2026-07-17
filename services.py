@@ -188,23 +188,27 @@ def update_registro_generico(tabela, item_id, dados):
 def delete_registro(tabela, item_id):
     """
     Remove permanentemente um registro de qualquer tabela pelo ID,
-    forçando conversão inteira e limpeza de cache instantânea.
+    validando para prevenir falhas caso o ID seja NoneType.
     """
+    if item_id is None:
+        st.error("Erro: Não foi possível capturar o identificador (ID) deste registro para exclusão.")
+        return False
+
     try:
         tabela_min = tabela.lower()
-        # Garante que o ID seja numérico inteiro para compatibilidade total com o Postgres
+        # Garante que o ID seja convertido para inteiro
         id_limpo = int(item_id)
         
         query = f"DELETE FROM {tabela_min} WHERE id = :id"
         
         sucesso = executar_query(query, {"id": id_limpo}, retornar_dados=False)
         if sucesso:
-            # Limpa de forma imediata e agressiva todos os seletores e tabelas em cache
+            # Limpa imediatamente todo o cache do Streamlit para atualizar as telas
             st.cache_data.clear()
             return True
         return False
     except ValueError:
-        st.error("Erro: O ID do registro precisa ser numérico.")
+        st.error(f"Erro: O ID do registro precisa ser numérico. Valor recebido: {item_id}")
         return False
     except Exception as e:
         st.error(f"Erro ao excluir registro de {tabela_min}: {e}")
