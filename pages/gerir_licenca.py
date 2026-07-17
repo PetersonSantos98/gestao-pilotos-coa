@@ -41,7 +41,9 @@ def render(go):
                 dados = {"licenca": serie, "data_vencimento": str(vencimento)}
                 
                 if modo_edicao:
-                    if services.update_registro_generico("Licencas_Validades", lic_data['id'], dados):
+                    # Captura flexível para evitar chaves nulas no dicionário de dados da licença
+                    id_registro = lic_data.get('id') if lic_data.get('id') is not None else lic_data.get('ID')
+                    if services.update_registro_generico("Licencas_Validades", id_registro, dados):
                         st.success("Licença atualizada!")
                 else:
                     if services.add_registro("Licencas_Validades", dados):
@@ -57,8 +59,12 @@ def render(go):
         # Criamos um expander ou caixinha de aviso para evitar exclusão acidental
         with st.expander("⚠️ Zona de Perigo - Excluir Registro"):
             st.warning("Tem certeza de que deseja deletar esta licença? Essa ação não pode ser desfeita.")
+            
+            # Captura o ID de forma dinâmica buscando por chaves minúsculas ou maiúsculas
+            id_para_excluir = lic_data.get('id') if lic_data.get('id') is not None else lic_data.get('ID')
+            
             if st.button("🗑️ Confirmar Exclusão Definitiva", type="primary", use_container_width=True):
-                if services.delete_registro("Licencas_Validades", lic_data['id']):
+                if services.delete_registro("Licencas_Validades", id_para_excluir):
                     st.success("Licença excluída com sucesso!")
                     st.session_state.licenca_edit = None
                     st.cache_data.clear()
