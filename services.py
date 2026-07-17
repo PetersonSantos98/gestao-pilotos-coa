@@ -16,12 +16,13 @@ def get_engine():
         return None
 
 def executar_query(query, params=None, retornar_dados=True):
-    """Auxiliar para executar comandos SQL de forma segura."""
+    """Auxiliar para executar comandos SQL de forma segura, garantindo o COMMIT em escritas."""
     engine = get_engine()
     if not engine:
         return [] if retornar_dados else False
     
     try:
+        # 'engine.begin()' cria uma transação automática e realiza o COMMIT físico ao final do bloco
         with engine.begin() as conn:
             resultado = conn.execute(text(query), params or {})
             if retornar_dados:
@@ -147,7 +148,7 @@ def update_equipamento(equip_id, dados):
     try:
         colunas_validas = ["nome", "antena", "monitor", "nav"]
         payload = {k: v for k, v in dados.items() if k in colunas_validas}
-        payload["id"] = equip_id
+        payload["id"] = int(equip_id)  # Força o ID como inteiro
 
         set_clause = ", ".join([f"{k} = :{k}" for k in payload.keys() if k != "id"])
         query = f"UPDATE equipamentos SET {set_clause} WHERE id = :id"
@@ -169,7 +170,7 @@ def update_registro_generico(tabela, item_id, dados):
     try:
         tabela_min = tabela.lower()
         payload = dict(dados)
-        payload["id"] = item_id
+        payload["id"] = int(item_id)  # Força o ID como inteiro
 
         set_clause = ", ".join([f"{k} = :{k}" for k in dados.keys()])
         query = f"UPDATE {tabela_min} SET {set_clause} WHERE id = :id"
@@ -186,16 +187,24 @@ def update_registro_generico(tabela, item_id, dados):
 
 def delete_registro(tabela, item_id):
     """
-    Remove permanentemente um registro de qualquer tabela pelo ID.
+    Remove permanentemente um registro de qualquer tabela pelo ID,
+    forçando conversão inteira e limpeza de cache instantânea.
     """
     try:
         tabela_min = tabela.lower()
+        # Garante que o ID seja numérico inteiro para compatibilidade total com o Postgres
+        id_limpo = int(item_id)
+        
         query = f"DELETE FROM {tabela_min} WHERE id = :id"
         
-        sucesso = executar_query(query, {"id": item_id}, retornar_dados=False)
+        sucesso = executar_query(query, {"id": id_limpo}, retornar_dados=False)
         if sucesso:
+            # Limpa de forma imediata e agressiva todos os seletores e tabelas em cache
             st.cache_data.clear()
             return True
+        return False
+    except ValueError:
+        st.error("Erro: O ID do registro precisa ser numérico.")
         return False
     except Exception as e:
         st.error(f"Erro ao excluir registro de {tabela_min}: {e}")
