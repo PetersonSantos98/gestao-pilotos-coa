@@ -1,6 +1,7 @@
 import streamlit as st
 import services
 import datetime
+import pandas as pd
 
 def render(go):
     lic_data = st.session_state.get("licenca_edit", None)
@@ -14,15 +15,15 @@ def render(go):
 
     # Início do formulário
     with st.form("form_licenca"):
-        serie = st.text_input("Número de Série (Licença)", value=str(lic_data.get('licenca', '')) if modo_edicao else "")
+        val_licenca = lic_data.get('licenca') if (modo_edicao and lic_data.get('licenca')) else ""
+        serie = st.text_input("Número de Série (Licença)", value=str(val_licenca))
         
         # Lógica para definir a data inicial do seletor
         if modo_edicao and lic_data.get('data_vencimento'):
             try:
-                if isinstance(lic_data['data_vencimento'], str):
-                    data_sugerida = datetime.datetime.strptime(lic_data['data_vencimento'], '%Y-%m-%d').date()
-                else:
-                    data_sugerida = lic_data['data_vencimento']
+                # pd.to_datetime trata tanto YYYY-MM-DD quanto formatos ISO com timestamp
+                dt_parsed = pd.to_datetime(lic_data['data_vencimento']).date()
+                data_sugerida = dt_parsed
             except Exception:
                 data_sugerida = datetime.date.today()
         else:
@@ -31,17 +32,15 @@ def render(go):
         # Widget de data com o valor recuperado e formato BR
         vencimento = st.date_input("Data de Vencimento", value=data_sugerida, format="DD/MM/YYYY")
 
-        # O botão de submit DEVE estar dentro do bloco 'with st.form'
         submetido = st.form_submit_button("💾 Salvar Alterações")
 
         if submetido:
-            if not serie:
+            if not serie.strip():
                 st.error("O número da licença é obrigatório.")
             else:
-                dados = {"licenca": serie, "data_vencimento": str(vencimento)}
+                dados = {"licenca": serie.strip(), "data_vencimento": str(vencimento)}
                 
                 if modo_edicao:
-                    # Captura flexível para evitar chaves nulas no dicionário de dados da licença
                     id_registro = lic_data.get('id') if lic_data.get('id') is not None else lic_data.get('ID')
                     if services.update_registro_generico("Licencas_Validades", id_registro, dados):
                         st.success("Licença atualizada!")
@@ -56,11 +55,9 @@ def render(go):
     # --- BOTÃO DE EXCLUIR (Apenas visível se estiver editando um item existente) ---
     if modo_edicao:
         st.write("---")
-        # Criamos um expander ou caixinha de aviso para evitar exclusão acidental
         with st.expander("⚠️ Zona de Perigo - Excluir Registro"):
             st.warning("Tem certeza de que deseja deletar esta licença? Essa ação não pode ser desfeita.")
             
-            # Captura o ID de forma dinâmica buscando por chaves minúsculas ou maiúsculas
             id_para_excluir = lic_data.get('id') if lic_data.get('id') is not None else lic_data.get('ID')
             
             if st.button("🗑️ Confirmar Exclusão Definitiva", type="primary", use_container_width=True):
