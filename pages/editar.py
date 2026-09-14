@@ -7,7 +7,12 @@ def render(go):
     id_edit = st.session_state.get("edit_id")
 
     if st.button("⬅️ Voltar"): 
-        go("frotas" if tipo == "frotas" else "home")
+        if tipo == "frotas":
+            go("frotas")
+        elif tipo in ["antenas", "monitores", "navs"]:
+            go(tipo)
+        else:
+            go("home")
 
     if not tipo:
         st.error("Erro: Tipo de edição não definido.")
@@ -24,32 +29,32 @@ def render(go):
 
         st.subheader(f"Edição de Vínculos - Frota: {item_frota['codigo_do_equipamento']}")
 
-        antenas_opt = services.get_itens_disponiveis("Antenas", "antena_serie", item_frota["antena"])
-        monitores_opt = services.get_itens_disponiveis("Monitores", "monitor_serie", item_frota["monitor"])
-        navs_opt = services.get_itens_disponiveis("Navs", "nav_serie", item_frota["nav"])
+        antenas_opt = services.get_itens_disponiveis("Antenas", "antena_serie", item_frota.get("antena"))
+        monitores_opt = services.get_itens_disponiveis("Monitores", "monitor_serie", item_frota.get("monitor"))
+        navs_opt = services.get_itens_disponiveis("Navs", "nav_serie", item_frota.get("nav"))
 
         VAZIO = {"antena_serie": None, "modelo_antena": None, "monitor_serie": None, "modelo_monitor": None, "nav_serie": None}
 
         with st.form("form_edit_frota"):
-            nome = st.text_input("Nome do Equipamento", value=item_frota["nome"])
+            nome = st.text_input("Nome do Equipamento", value=item_frota.get("nome") or "")
             
             # Antena
             l_antenas = [VAZIO] + antenas_opt
-            idx_ant = next((i for i, x in enumerate(l_antenas) if x["antena_serie"] == item_frota["antena"]), 0)
+            idx_ant = next((i for i, x in enumerate(l_antenas) if x["antena_serie"] == item_frota.get("antena")), 0)
             antena = st.selectbox("Antena", options=l_antenas, index=idx_ant,
-                                  format_func=lambda x: f"{x['antena_serie']} ({x['modelo_antena']})" if x["antena_serie"] else "❌ Remover")
+                                  format_func=lambda x: f"{x['antena_serie']} ({x.get('modelo_antena', '')})" if x.get("antena_serie") else "❌ Remover")
 
             # Monitor
             l_monitores = [VAZIO] + monitores_opt
-            idx_mon = next((i for i, x in enumerate(l_monitores) if x["monitor_serie"] == item_frota["monitor"]), 0)
+            idx_mon = next((i for i, x in enumerate(l_monitores) if x["monitor_serie"] == item_frota.get("monitor")), 0)
             monitor = st.selectbox("Monitor", options=l_monitores, index=idx_mon,
-                                   format_func=lambda x: f"{x['monitor_serie']} ({x['modelo_monitor']})" if x["monitor_serie"] else "❌ Remover")
+                                   format_func=lambda x: f"{x['monitor_serie']} ({x.get('modelo_monitor', '')})" if x.get("monitor_serie") else "❌ Remover")
 
             # NAV
             l_navs = [VAZIO] + navs_opt
-            idx_nav = next((i for i, x in enumerate(l_navs) if x["nav_serie"] == item_frota["nav"]), 0)
+            idx_nav = next((i for i, x in enumerate(l_navs) if x["nav_serie"] == item_frota.get("nav")), 0)
             nav = st.selectbox("NAV", options=l_navs, index=idx_nav,
-                               format_func=lambda x: f"{x['nav_serie']}" if x["nav_serie"] else "❌ Remover")
+                               format_func=lambda x: f"{x['nav_serie']}" if x.get("nav_serie") else "❌ Remover")
 
             if st.form_submit_button("💾 Salvar Alterações"):
                 payload = {
@@ -85,26 +90,26 @@ def render(go):
 
             if tipo == "antenas":
                 tabela = "Antenas"
-                serie = st.text_input("Série", value=item.get("antena_serie"))
-                mod = st.text_input("Modelo", value=item.get("modelo_antena"))
-                mar = st.text_input("Marca Sinal", value=item.get("marca_sinal"))
+                serie = st.text_input("Série", value=item.get("antena_serie") or "")
+                mod = st.text_input("Modelo", value=item.get("modelo_antena") or "")
+                mar = st.text_input("Marca Sinal", value=item.get("marca_sinal") or "")
                 novos_dados = {"antena_serie": serie, "modelo_antena": mod, "marca_sinal": mar}
 
             elif tipo == "monitores":
                 tabela = "Monitores"
-                serie = st.text_input("Série", value=item.get("monitor_serie"))
-                mod = st.text_input("Modelo", value=item.get("modelo_monitor"))
+                serie = st.text_input("Série", value=item.get("monitor_serie") or "")
+                mod = st.text_input("Modelo", value=item.get("modelo_monitor") or "")
                 novos_dados = {"monitor_serie": serie, "modelo_monitor": mod}
 
             elif tipo == "navs":
                 tabela = "Navs"
-                serie = st.text_input("Série", value=item.get("nav_serie"))
+                serie = st.text_input("Série", value=item.get("nav_serie") or "")
                 novos_dados = {"nav_serie": serie}
 
             if st.form_submit_button("💾 Salvar Alterações"):
                 if services.update_registro_generico(tabela, item['id'], novos_dados):
                     st.success("Cadastro atualizado!")
-                    go("home")
+                    go(tipo if tipo in ["antenas", "monitores", "navs"] else "home")
 
         # Excluir Componente
         st.write("---")
@@ -113,4 +118,4 @@ def render(go):
             if st.button(f"🗑️ Confirmar Exclusão de {tipo.title()}", type="primary", use_container_width=True):
                 if services.delete_registro(tabela, item['id']):
                     st.success("Componente excluído!")
-                    go("home")
+                    go(tipo if tipo in ["antenas", "monitores", "navs"] else "home")
