@@ -11,7 +11,7 @@ def render(go):
     monitores = get_itens_disponiveis("Monitores", "monitor_serie")
     navs = get_itens_disponiveis("Navs", "nav_serie")
 
-    with st.form("form_nova_frota"):
+    with st.form("form_nova_frota", clear_on_submit=True):
         codigo = st.text_input("Código do Equipamento (Prefixo)", placeholder="Ex: 1118")
         nome = st.text_input("Nome/Descrição", placeholder="Ex: Colhedora John Deere")
         
@@ -19,7 +19,7 @@ def render(go):
         
         # Selectbox que mostra apenas o que está livre no estoque
         antena = st.selectbox("Selecionar Antena Disponível", 
-                              options=[None] + [a['antena_serie'] for a in antenas])
+                               options=[None] + [a['antena_serie'] for a in antenas])
         
         monitor = st.selectbox("Selecionar Monitor Disponível", 
                                options=[None] + [m['monitor_serie'] for m in monitores])
@@ -40,5 +40,5 @@ def render(go):
                 }
                 # Insere na tabela Equipamentos do Supabase
                 if add_registro("Equipamentos", dados):
-                    st.success(f"Equipamento {codigo} cadastrado!")
+                    st.success(f"Equipamento {codigo} cadastrado com sucesso!")
                     st.balloons()
