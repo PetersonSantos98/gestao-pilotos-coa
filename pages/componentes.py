@@ -4,7 +4,7 @@ from services import get_itens_com_status, add_registro
 def render(go, tipo):
     if st.button("⬅️ Voltar"): go("home")
     
-    # Configurações de mapeamento
+    # Configurações de mapeamento de tabelas do Supabase (com maiúsculas)
     tabelas = {"antenas": "Antenas", "monitores": "Monitores", "navs": "Navs"}
     colunas_serie = {"antenas": "antena_serie", "monitores": "monitor_serie", "navs": "nav_serie"}
     
@@ -15,7 +15,7 @@ def render(go, tipo):
 
     # --- FORMULÁRIO DE CADASTRO ---
     with st.expander(f"➕ Novo Cadastro de {nome_tabela[:-1]}"):
-        with st.form(f"form_add_{tipo}"):
+        with st.form(f"form_add_{tipo}", clear_on_submit=True):
             dados_final = {}
             
             if tipo == "antenas":
@@ -46,9 +46,10 @@ def render(go, tipo):
     dados = get_itens_com_status(nome_tabela, coluna_id)
     
     if busca:
-        dados = [d for d in dados if any(busca.lower() in str(v).lower() for v in d.values())]
+        dados = [d for d in dados if any(busca.lower() in str(v).lower() for v in d.values() if v is not None)]
 
     for item in dados:
+        item_id = item.get("id") or item.get(coluna_id)
         with st.container(border=True):
             col_dados, col_acao = st.columns([0.85, 0.15])
             
@@ -69,9 +70,9 @@ def render(go, tipo):
                     st.success("✅ Disponível em Estoque")
             
             with col_acao:
-                # CORREÇÃO: Define o item e tipo, e limpa o edit_id de frotas
-                if st.button("📝 Editar", key=f"edit_comp_{item.get(coluna_id)}"):
+                # Usa a ID do registro para garantir uma chave única e segura no Streamlit
+                if st.button("📝 Editar", key=f"edit_comp_{tipo}_{item_id}"):
                     st.session_state.tipo_edicao = tipo
                     st.session_state.item_para_editar = item
-                    st.session_state.edit_id = None # Garante que não carregará formulário de frotas
+                    st.session_state.edit_id = None  # Garante que não carregará formulário de frotas
                     go("editar")
