@@ -13,12 +13,12 @@ def render(go):
         margin: auto;
     }
 
-    /* Estilização do Título Centralizado */
+    /* Estilização do Título Centralizado com suporte a Dark/Light Mode */
     .main-title {
         font-size: 24px !important;
         font-weight: 700;
         text-align: center;
-        color: #FFFFFF;
+        color: var(--text-color, #FFFFFF);
         margin-bottom: 20px;
         line-height: 1.2;
     }
@@ -44,7 +44,7 @@ def render(go):
     </style>
 """, unsafe_allow_html=True)
 
-    # Título Centralizado e com fonte menor que o padrão H1
+    # Título Centralizado
     st.markdown('<div class="main-title">🚜 Gestão de Componentes</div>', unsafe_allow_html=True)
 
     # ================================
@@ -86,4 +86,5 @@ def render(go):
 
     if st.button("🔄 Atualizar Dados", use_container_width=True):
         st.cache_data.clear()
+        st.toast("Dados atualizados com sucesso!", icon="🔄")
         st.rerun()
