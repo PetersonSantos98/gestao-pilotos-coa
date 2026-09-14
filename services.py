@@ -1,51 +1,39 @@
 import streamlit as st
-from sqlalchemy import create_engine, text
-import pandas as pd
+from supabase import create_client, Client
 
-# --- CONEXÃO COM O POSTGRESQL (RENDER) ---
+# --- CONEXÃO COM O SUPABASE ---
 
 @st.cache_resource
-def get_engine():
-    """Cria e faz cache do engine de conexão com o PostgreSQL do Render."""
+def get_supabase_client() -> Client:
+    """Cria e faz cache do cliente oficial do Supabase."""
     try:
-        pg = st.secrets["postgres"]
-        db_url = f"postgresql://{pg['username']}:{pg['password']}@{pg['host']}:{pg['port']}/{pg['database']}"
-        return create_engine(db_url)
+        url = st.secrets["supabase"]["url"]
+        key = st.secrets["supabase"]["key"]
+        return create_client(url, key)
     except Exception as e:
-        st.error(f"Erro ao carregar credenciais do banco: {e}")
+        st.error(f"Erro ao inicializar cliente Supabase: {e}")
         return None
-
-def executar_query(query, params=None, retornar_dados=True):
-    """Auxiliar para executar comandos SQL de forma segura, garantindo o COMMIT em escritas."""
-    engine = get_engine()
-    if not engine:
-        return [] if retornar_dados else False
-    
-    try:
-        # 'engine.begin()' cria uma transação automática e realiza o COMMIT físico ao final do bloco
-        with engine.begin() as conn:
-            resultado = conn.execute(text(query), params or {})
-            if retornar_dados:
-                # Converte os resultados em uma lista de dicionários
-                return [dict(row._mapping) for row in resultado]
-            return True
-    except Exception as e:
-        st.error(f"Erro na execução da query: {e}")
-        return [] if retornar_dados else False
 
 # --- BUSCAS DE DADOS ---
 
 @st.cache_data(ttl=10)
 def get_equipamentos():
-    """Busca a frota e anexa os modelos das peças."""
+    """Busca a frota e anexa os dados de antenas e monitores."""
+    supabase = get_supabase_client()
+    if not supabase:
+        return []
+
     try:
         # Busca equipamentos
-        query_eq = "SELECT id, codigo_do_equipamento, nome, antena, monitor, nav FROM equipamentos ORDER BY codigo_do_equipamento"
-        equipamentos = executar_query(query_eq)
+        res_eq = supabase.table("Equipamentos").select("id, codigo_do_equipamento, nome, antena, monitor, nav").order("codigo_do_equipamento").execute()
+        equipamentos = res_eq.data or []
 
-        # Busca antenas e monitores para fazer o de-para
-        antenas_list = executar_query("SELECT * FROM antenas")
-        monitores_list = executar_query("SELECT * FROM monitores")
+        # Busca antenas e monitores
+        res_antenas = supabase.table("Antenas").select("*").execute()
+        res_monitores = supabase.table("Monitores").select("*").execute()
+
+        antenas_list = res_antenas.data or []
+        monitores_list = res_monitores.data or []
 
         antenas = {a["antena_serie"]: a for a in antenas_list if "antena_serie" in a}
         monitores = {m["monitor_serie"]: m for m in monitores_list if "monitor_serie" in m}
@@ -64,15 +52,17 @@ def get_equipamentos():
 
 @st.cache_data(ttl=10)
 def get_itens_com_status(tabela, coluna_serie):
-    """
-    RASTREAMENTO TIPO VENCIMENTO:
-    Identifica se a peça está em uso e por qual trator.
-    """
+    """Rastreamento de status de vínculo do componente."""
+    supabase = get_supabase_client()
+    if not supabase:
+        return []
+
     try:
-        # Garante nome de tabela em minúsculo para o Postgres
-        tabela_min = tabela.lower()
-        pecas = executar_query(f"SELECT * FROM {tabela_min}")
-        frota = executar_query("SELECT codigo_do_equipamento, antena, monitor, nav FROM equipamentos")
+        pecas_res = supabase.table(tabela).select("*").execute()
+        frota_res = supabase.table("Equipamentos").select("codigo_do_equipamento, antena, monitor, nav").execute()
+
+        pecas = pecas_res.data or []
+        frota = frota_res.data or []
 
         mapa_vinculos = {}
         for trator in frota:
@@ -91,29 +81,44 @@ def get_itens_com_status(tabela, coluna_serie):
 
         return pecas
     except Exception as e:
-        st.error(f"Erro ao processar status e vínculos: {e}")
+        st.error(f"Erro ao processar status e vínculos em {tabela}: {e}")
         return []
 
 
 @st.cache_data(ttl=10)
 def get_licencas_simples():
-    """Busca as licenças para a página de vencimentos."""
-    query = "SELECT * FROM licencas_validades ORDER BY data_vencimento"
-    return executar_query(query)
+    """Busca as licenças ordenadas pela data de vencimento."""
+    supabase = get_supabase_client()
+    if not supabase:
+        return []
+
+    try:
+        res = supabase.table("Licencas_Validades").select("*").order("data_vencimento").execute()
+        return res.data or []
+    except Exception as e:
+        st.error(f"Erro ao buscar licenças: {e}")
+        return []
 
 
 @st.cache_data(ttl=10)
 def get_tabela_simples(tabela):
-    """Busca dados brutos de qualquer tabela auxiliar."""
-    tabela_min = tabela.lower()
-    query = f"SELECT * FROM {tabela_min}"
-    return executar_query(query)
+    """Busca registros brutos de qualquer tabela."""
+    supabase = get_supabase_client()
+    if not supabase:
+        return []
+
+    try:
+        res = supabase.table(tabela).select("*").execute()
+        return res.data or []
+    except Exception as e:
+        st.error(f"Erro ao buscar tabela {tabela}: {e}")
+        return []
 
 
 # --- OPERAÇÕES DE BANCO (CRUD) ---
 
 def get_itens_disponiveis(tabela, coluna_serie, valor_atual=None):
-    """Filtra itens para o SELECT de edição."""
+    """Filtra itens para o selectbox de edição."""
     try:
         todos = get_itens_com_status(tabela, coluna_serie)
         return [
@@ -125,101 +130,95 @@ def get_itens_disponiveis(tabela, coluna_serie, valor_atual=None):
 
 
 def add_registro(tabela, dados):
-    """Insere novos registros no banco dinamicamente."""
+    """Insere novos registros."""
+    supabase = get_supabase_client()
+    if not supabase:
+        return False
+
     try:
-        tabela_min = tabela.lower()
-        colunas = ", ".join(dados.keys())
-        valores_placeholder = ", ".join([f":{k}" for k in dados.keys()])
-        
-        query = f"INSERT INTO {tabela_min} ({colunas}) VALUES ({valores_placeholder})"
-        
-        sucesso = executar_query(query, dados, retornar_dados=False)
-        if sucesso:
+        res = supabase.table(tabela).insert(dados).execute()
+        if res.data:
             st.cache_data.clear()
             return True
         return False
     except Exception as e:
-        st.error(f"Erro ao inserir: {e}")
+        st.error(f"Erro ao inserir em {tabela}: {e}")
         return False
 
 
 def update_equipamento(equip_id, dados):
     """Atualiza equipamento."""
+    supabase = get_supabase_client()
+    if not supabase:
+        return False
+
     try:
         colunas_validas = ["nome", "antena", "monitor", "nav"]
         payload = {k: v for k, v in dados.items() if k in colunas_validas}
-        payload["id"] = int(equip_id)  # Força o ID como inteiro
 
-        set_clause = ", ".join([f"{k} = :{k}" for k in payload.keys() if k != "id"])
-        query = f"UPDATE equipamentos SET {set_clause} WHERE id = :id"
-
-        sucesso = executar_query(query, payload, retornar_dados=False)
-        if sucesso:
+        res = supabase.table("Equipamentos").update(payload).eq("id", int(equip_id)).execute()
+        if res.data:
             st.cache_data.clear()
             return True
         return False
     except Exception as e:
-        st.error(f"Erro ao atualizar: {e}")
+        st.error(f"Erro ao atualizar equipamento: {e}")
         return False
 
 
 def update_registro_generico(tabela, item_id, dados):
-    """
-    Atualiza Antenas, Monitores, Navs ou Licenças.
-    """
+    """Atualiza Antenas, Monitores, Navs ou Licenças."""
+    supabase = get_supabase_client()
+    if not supabase:
+        return False
+
     try:
-        tabela_min = tabela.lower()
         payload = dict(dados)
-        payload["id"] = int(item_id)  # Força o ID como inteiro
+        if "id" in payload:
+            del payload["id"]  # Evita tentar atualizar a chave primária
 
-        set_clause = ", ".join([f"{k} = :{k}" for k in dados.keys()])
-        query = f"UPDATE {tabela_min} SET {set_clause} WHERE id = :id"
-
-        sucesso = executar_query(query, payload, retornar_dados=False)
-        if sucesso:
+        res = supabase.table(tabela).update(payload).eq("id", int(item_id)).execute()
+        if res.data:
             st.cache_data.clear()
             return True
         return False
     except Exception as e:
-        st.error(f"Erro ao atualizar {tabela_min}: {e}")
+        st.error(f"Erro ao atualizar em {tabela}: {e}")
         return False
 
 
 def delete_registro(tabela, item_id):
-    """
-    Remove permanentemente um registro de qualquer tabela pelo ID,
-    validando para prevenir falhas caso o ID seja NoneType.
-    """
+    """Remove um registro pelo ID."""
     if item_id is None:
-        st.error("Erro: Não foi possível capturar o identificador (ID) deste registro para exclusão.")
+        st.error("Erro: Não foi possível capturar o identificador (ID) para exclusão.")
+        return False
+
+    supabase = get_supabase_client()
+    if not supabase:
         return False
 
     try:
-        tabela_min = tabela.lower()
-        # Garante que o ID seja convertido para inteiro
-        id_limpo = int(item_id)
-        
-        query = f"DELETE FROM {tabela_min} WHERE id = :id"
-        
-        sucesso = executar_query(query, {"id": id_limpo}, retornar_dados=False)
-        if sucesso:
-            # Limpa imediatamente todo o cache do Streamlit para atualizar as telas
+        res = supabase.table(tabela).delete().eq("id", int(item_id)).execute()
+        if res.data:
             st.cache_data.clear()
             return True
         return False
     except ValueError:
-        st.error(f"Erro: O ID do registro precisa ser numérico. Valor recebido: {item_id}")
+        st.error(f"Erro: O ID precisa ser numérico. Recebido: {item_id}")
         return False
     except Exception as e:
-        st.error(f"Erro ao excluir registro de {tabela_min}: {e}")
+        st.error(f"Erro ao excluir registro de {tabela}: {e}")
         return False
 
 
 def verificar_login(usuario, senha):
     """Validação de acesso simples contra a tabela 'usuarios'."""
+    supabase = get_supabase_client()
+    if not supabase:
+        return False
+
     try:
-        query = "SELECT * FROM usuarios WHERE usuarios = :usuario AND senha = :senha"
-        res = executar_query(query, {"usuario": usuario, "senha": senha})
-        return len(res) > 0
+        res = supabase.table("usuarios").select("*").eq("usuarios", usuario).eq("senha", senha).execute()
+        return len(res.data) > 0
     except Exception:
         return False
