@@ -215,10 +215,24 @@ def verificar_login(usuario, senha):
     """Validação de acesso simples contra a tabela 'usuarios'."""
     supabase = get_supabase_client()
     if not supabase:
+        print("Erro: Cliente Supabase não inicializado.")
         return False
 
     try:
-        res = supabase.table("usuarios").select("*").eq("usuarios", usuario).eq("senha", senha).execute()
+        # Garante que ambos os parâmetros sejam enviados como String para o Supabase (text)
+        usr_str = str(usuario).strip()
+        pwd_str = str(senha).strip()
+
+        res = (
+            supabase.table("usuarios")
+            .select("*")
+            .eq("usuarios", usr_str)
+            .eq("senha", pwd_str)
+            .execute()
+        )
+        
         return len(res.data) > 0
-    except Exception:
+
+    except Exception as e:
+        print(f"Erro ao verificar login no Supabase: {e}")
         return False
